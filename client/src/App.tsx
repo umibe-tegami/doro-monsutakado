@@ -20,12 +20,13 @@ superLeft: number;
 ultraReserved: boolean;
 guarantee: number;
 revivesUsed: number;
+skitPlayed: boolean;
 lastCards: number[];
 lastNew: boolean[];
 }
 const freshBattle = (): Battle => ({
 active: true, mode: 'normal', streak: 0, damage: 0, superLeft: 0,
-ultraReserved: false, guarantee: 0, revivesUsed: 0, lastCards: [], lastNew: [],
+ultraReserved: false, guarantee: 0, revivesUsed: 0, skitPlayed: false, lastCards: [], lastNew: [],
 });
 const BKEY = 'doro-battle-v1';
 function loadBattle(): Battle | null {
@@ -188,7 +189,10 @@ if (B.revivesUsed < 2) setShowRevive(true);
 else finishRun();
 return;
 }
-if (Math.floor(B.streak / 5) > Math.floor(prevStreak / 5) && B.streak > 0) {
+if (!B.skitPlayed && Math.floor(B.streak / 5) > Math.floor(prevStreak / 5) && B.streak > 0) {
+const B2: Battle = {...B, skitPlayed: true};
+setBattle(B2);
+battleRef.current = B2;
 window.setTimeout(playSkit, 500);
 }
 }, [busy, drawCards, announce, refresh, playSkit, finishRun]);
@@ -258,7 +262,7 @@ return (
 <div className="view">
 <div className="title-wrap">
 <div className="game-logo">ドロー<br />モンスター<br />カード</div>
-<p className="note" style={{ textAlign: 'center'}}>引くたびモンスター、1枚1500ダメージ。<br />外れるまで終われない、バーサーカーソウル。</p>
+<p className="note" style={{ textAlign: 'center'}}>引くたびモンスター、1枚1500ダメージ。<br />外れるまで終われない、バーサーカータマシイ。</p>
 <button className="bigbtn" onClick={startRun}>{battle?.active? '対戦を再開する': 'デュエル開始！'}</button>
 <button className="subbtn" onClick={() => setView('dex')}>図鑑を見る</button>
 <button className="subbtn" onClick={() => setView('shop')}>ショップ</button>
@@ -347,7 +351,7 @@ return (
 {showIntro && (
 <div className="overlay">
 <div className="announce">
-<h3 style={{ fontSize: 20}}>速攻魔法発動！！<br />バーサーカーソウル！！</h3>
+<h3 style={{ fontSize: 20}}>速攻魔法発動！！<br />バーサーカータマシイ！！</h3>
 <p>ドローする度にモンスターなら相手に1500ダメージ。外れるまでドローし続けられる。モンスターを引くほど連チャンとソウルが増えていく、捨て身の速攻魔法。</p>
 <button className="bigbtn" onClick={() => setShowIntro(false)}>ドローを開始する</button>
 </div>
