@@ -214,6 +214,7 @@ else B.mode = 'normal';
 setBattle(B); battleRef.current = B;
 setShowRevive(false); setShowAd(false);
 await refresh().catch(() => {});
+if (B.mode === 'ultra') { au.playSe('garo_navi'); au.vibrate(260);}
 announce({ title: '自己蘇生！！', sub: B.mode === 'ultra'? 'ウルトラモードから再開！': '通常モードから再開！', tone: B.mode === 'ultra'? 'ultra': 'info'});
 }, [refresh, announce]);
 
