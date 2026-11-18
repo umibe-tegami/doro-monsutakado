@@ -373,7 +373,7 @@ return (
 {showAd && (
 <div className="overlay">
 <div className="modal">
-<AdDemo onDone={() => doRevive('ad')} onCancel={() => setShowAd(false)} />
+<AdPreparing onDone={() => doRevive('ad')} onCancel={() => setShowAd(false)} />
 </div>
 </div>
 )}
@@ -410,7 +410,7 @@ img.src = URL.createObjectURL(file);
 });
 }
 
-function AdDemo({ onDone, onCancel}: { onDone: () => void; onCancel: () => void}) {
+function AdPreparing({ onDone, onCancel}: { onDone: () => void; onCancel: () => void}) {
 const [sec, setSec] = useState(5);
 useEffect(() => {
 if (sec <= 0) return;
@@ -419,8 +419,8 @@ return () => window.clearTimeout(t);
 }, [sec]);
 return (
 <div>
-<div className="adbox">🌟 広告（デモ）🌟<br /><span style={{ fontSize: 13}}>ドローモンスターカードを遊んでくれてありがとう！</span></div>
-<p className="note" style={{ textAlign: 'center'}}>{sec > 0? `あと ${sec} 秒…`: '視聴ありがとうございました'}</p>
+<div className="adbox">広告は準備中です<br /><span style={{ fontSize: 13, fontWeight: 400}}>広告が始まったら、ここに広告が表示されます。あと少しだけお待ちください。</span></div>
+<p className="note" style={{ textAlign: 'center'}}>{sec > 0? `あと ${sec} 秒…`: 'お待たせしました'}</p>
 <button className="bigbtn" disabled={sec > 0} onClick={onDone}>自己蘇生する</button>
 <button className="subbtn" onClick={onCancel}>やめる</button>
 </div>

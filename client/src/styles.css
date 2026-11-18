@@ -113,5 +113,5 @@ table.rank tr.me { background: rgba(240,180,41,.14); font-weight: 800; }
 .flowbox { width: 100%; border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.65; border: 2.5px solid; background: #10142c; }
 .flowbox b { font-size: 15px; }
 .flowarrow { color: #8fa0d8; font-size: 12.5px; text-align: center; line-height: 1.5; }
-.adbox { text-align: center; padding: 26px 12px; border-radius: 14px; background: linear-gradient(135deg,#ff5f6d,#b04fd8,#4db2ff); font-weight: 900; font-size: 19px; }
+.adbox { text-align: center; padding: 26px 12px; border-radius: 14px; background: #232838; border: 1px solid #4a5468; color: #cfd6e4; font-weight: 700; font-size: 19px; }
 .packresult { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
