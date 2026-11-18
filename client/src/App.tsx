@@ -269,7 +269,7 @@ return (
 
 {view === 'battle' && battle && (
 <div className="view" style={{ paddingLeft: battle.mode!== 'normal'? 30: 12, paddingRight: battle.mode!== 'normal'? 30: 12}}>
-<div className="battle-bg" style={selBg? { backgroundImage: `url(/media/bg/${selBg.id}.jpg)`}: { background: 'radial-gradient(circle at 50% 30%, #2a3566, #0b0e1a 75%)', opacity: 1}} />
+<div className="battle-bg" style={selBg? { backgroundImage: `url(/media/bg/${selBg.id}.jpg)`}: { backgroundImage: 'url(/media/arena.webp)', opacity: 1}} />
 {battle.mode!== 'normal' && (<>
 <div className={`rail left ${battle.mode}`}>{MODE_LABEL[battle.mode]}</div>
 <div className={`rail right ${battle.mode}`}>{MODE_LABEL[battle.mode]}</div>
@@ -630,7 +630,7 @@ setPackResult(r.cards.map((c) => ({ speciesId: c.speciesId, isNew: c.isNew})));
 <h2 className="sec">対戦背景（各500ソウル）</h2>
 <div className="cosgrid">
 <button className={`coscard ${player.selectedBg === 'default'? 'sel': ''}`} onClick={() => buy(async () => setPlayer(await api.selectCosmetic('background', 'default')), '標準背景にしました')}>
-<div style={{ height: 74, background: 'radial-gradient(circle at 50% 30%, #2a3566, #0b0e1a 75%)'}} />
+<div style={{ height: 74, backgroundImage: 'url(/media/arena.webp)', backgroundSize: 'cover', backgroundPosition: 'center'}} />
 <div className="cn">標準アリーナ</div><div className="cp">使用中にする</div>
 </button>
 {BACKGROUNDS.map((bg) => {
