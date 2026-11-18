@@ -11,7 +11,7 @@ export function playerId(): string {
 export interface CollectionEntry { count: number; firstGotAt: number | null }
 export interface PlayerState {
   playerId: string; name: string; souls: number; lifetimeSouls: number;
-  adFree: boolean; doubleDraw: boolean; bgmEnabled: boolean; voiceMuted: boolean;
+  adFree: boolean; bgmEnabled: boolean; voiceMuted: boolean;
   selectedBg: string; selectedBack: string; customArt: string | null;
   createdAt: number; compElapsedMs: number | null;
   collection: Record<number, CollectionEntry>;

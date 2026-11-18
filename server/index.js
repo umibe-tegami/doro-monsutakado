@@ -89,7 +89,6 @@ async function playerState(id) {
     souls: Number(p.souls),
     lifetimeSouls: Number(p.lifetime_souls),
     adFree: !!Number(p.ad_free),
-    doubleDraw: !!Number(p.double_draw),
     bgmEnabled: !!Number(p.bgm_enabled),
     voiceMuted: !!Number(p.voice_muted),
     selectedBg: p.selected_bg,
@@ -261,18 +260,17 @@ app.post('/api/redeem-code', async (req, res) => {
   if (row.used_by) return res.status(400).json({ error: 'このコードは既に使用されています' });
   const p = await getPlayer(id);
   const item = row.item_id;
+  if (item === 'double_draw') return res.status(400).json({ error: '2ドローパスは販売を終了しました' });
   if (item === 'ad_free' && Number(p.ad_free)) return res.status(400).json({ error: '既に所有しています（コードは消費されません）' });
-  if (item === 'double_draw' && Number(p.double_draw)) return res.status(400).json({ error: '既に所有しています（コードは消費されません）' });
   await db.run('UPDATE redemption_codes SET used_by = $1, used_at = $2 WHERE code = $3', [id, Date.now(), code]);
   let message = '';
   if (item === 'ad_free') { await db.run('UPDATE players SET ad_free = 1 WHERE id = $1', [id]); message = '広告無期限廃止が有効になりました'; }
-  else if (item === 'double_draw') { await db.run('UPDATE players SET double_draw = 1 WHERE id = $1', [id]); message = '2ドローパスが有効になりました'; }
   else if (SOUL_PACKS[item]) {
     await db.run('UPDATE players SET souls = souls + $1, lifetime_souls = lifetime_souls + $1 WHERE id = $2', [SOUL_PACKS[item], id]);
     message = `${SOUL_PACKS[item].toLocaleString()}ソウルを付与しました`;
   }
   const st = await playerState(id);
-  res.json({ item, message, souls: st.souls, adFree: st.adFree, doubleDraw: st.doubleDraw });
+  res.json({ item, message, souls: st.souls, adFree: st.adFree });
 });
 
 app.post('/api/submit-score', async (req, res) => {

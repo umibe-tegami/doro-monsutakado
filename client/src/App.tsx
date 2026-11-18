@@ -38,7 +38,6 @@ const MODE_LABEL: Record<Mode, string> = { normal: '通常モード', super: '�
 
 const PREMIUM: { id: string; name: string; price: string; url: string; desc: string}[] = [
 { id: 'ad_free', name: '広告無期限廃止', price: '¥280', url: 'https://buy.stripe.com/fZu00jeXN3Z26Nmfv82VG00', desc: '自己蘇生に広告が不要になります'},
-{ id: 'double_draw', name: '2ドローパス', price: '¥280', url: 'https://buy.stripe.com/eVq28rg1R2UYc7G4Qu2VG01', desc: '1枚ドローが2枚になります（3枚/5枚ドローは対象外）'},
 { id: 'souls300', name: '300ソウル', price: '¥120', url: 'https://buy.stripe.com/14A8wPaHxfHK5Ji96K2VG02', desc: ''},
 { id: 'souls1000', name: '1,000ソウル', price: '¥320', url: 'https://buy.stripe.com/9B6dR98zpbrugnW0Ae2VG03', desc: ''},
 { id: 'souls2500', name: '2,500ソウル', price: '¥680', url: 'https://buy.stripe.com/28E00jg1R9jm6Nm4Qu2VG04', desc: ''},
@@ -124,7 +123,6 @@ const B: Battle = {...B0};
 const prevStreak = B.streak;
 let ended = false;
 try {
-const dd = playerRef.current?.doubleDraw? 2: 1;
 if (B.mode === 'normal') {
 const r = Math.random();
 if (r < 0.10) {
@@ -134,10 +132,10 @@ announce({ title: 'スーパーモード突入！！', sub: '3回連続ドロー
 } else if (r < 0.30) {
 ended = true;
 } else {
-await drawCards(dd, B);
+await drawCards(1, B);
 }
 } else if (B.mode === 'super') {
-await drawCards(dd, B);
+await drawCards(1, B);
 if (Math.random() < 0.234) B.ultraReserved = true;
 B.superLeft -= 1;
 if (B.superLeft <= 0) {
@@ -677,7 +675,7 @@ onClick={() => owned
 <h2 className="sec">課金アイテム</h2>
 <div className="goldbox"><br />ご購入後、解除コードを購入時のメールアドレス宛に yamamoto510yoh@gmail.com からお送りします。届いたコードを下の「コード入力」に入力すると反映されます。</div>
 {PREMIUM.map((it) => {
-const owned = (it.id === 'ad_free' && player.adFree) || (it.id === 'double_draw' && player.doubleDraw);
+const owned = it.id === 'ad_free' && player.adFree;
 return (
 <div key={it.id} className="shopitem">
 <h4>{it.name} <span className="price">{it.price}</span></h4>

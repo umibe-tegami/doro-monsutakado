@@ -10,7 +10,6 @@ const dir = process.env.CODES_DIR;
 if (!dir) { console.error('Set CODES_DIR to the folder holding the code list files.'); process.exit(1); }
 const MAP = {
   'adfree_codes.txt': 'ad_free',
-  'double_draw_codes.txt': 'double_draw',
   'souls300_codes.txt': 'souls300',
   'souls1000_codes.txt': 'souls1000',
   'souls2500_codes.txt': 'souls2500',
