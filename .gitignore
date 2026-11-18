@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+.data/
+*.db
+*.sqlite
+*.sqlite3
+seed.json
+seed*.json
+*seed*.txt
+REDEMPTION_CODES_SEED*
+.DS_Store
