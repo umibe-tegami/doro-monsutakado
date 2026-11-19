@@ -930,7 +930,7 @@ const PACK_INFO = [
 { kind: 'normal', name: 'ノーマルパック', price: 100, desc: 'ランダム3枚。ノーマルからアルティメットレジェンドまで全てのレアリティが出ます。'},
 { kind: 'rare', name: 'レア以上確定パック', price: 300, desc: 'ランダム10枚、全てレア以上。アルティメットレジェンド（0.025%）も出現します。'},
 { kind: 'unowned', name: '未所持確定パック', price: 1000, desc: '未所持のカードが必ず1枚出ます。※アルティメットレジェンドは出現しません。'},
-{ kind: 'ultimate', name: 'アルティメットレジェンド確定パック', price: 10000, desc: '虹霓の創世龍レインボー＝オリジンが必ず出ます。カード裏面コンプリートで解放。'},
+{ kind: 'ultimate', name: 'アルティメットレジェンド確定パック', price: 6000, desc: '虹霓の創世龍レインボー＝オリジンが必ず出ます。カード裏面コンプリートで解放。'},
 ];
 
 function ShopView({ player, refresh, setPlayer}: { player: PlayerState; refresh: () => Promise<PlayerState>; setPlayer: (p: PlayerState) => void}) {
