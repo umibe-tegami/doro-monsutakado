@@ -757,7 +757,7 @@ img.src = URL.createObjectURL(file);
 }
 
 function AdPreparing({ onDone, onCancel, auto = false}: { onDone: () => void; onCancel: () => void; auto?: boolean}) {
-const [sec, setSec] = useState(8);
+const [sec, setSec] = useState(12);
 useEffect(() => {
 if (sec <= 0) return;
 const t = window.setTimeout(() => setSec(sec - 1), 1000);
