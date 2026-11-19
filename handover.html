@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ドローモンスターカード</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{background:#0b0e1a;color:#f2f4fa;font-family:sans-serif;text-align:center;padding:40px 16px}</style>
+</head>
+<body>
+<p>新しいアドレスへ移動しています…</p>
+<script>
+try {
+  var id = localStorage.getItem('doro-player-id');
+  var url = 'https://doromonster.com/' + (id ? ('?pid=' + encodeURIComponent(id)) : '');
+  location.replace(url);
+} catch (e) {
+  location.replace('https://doromonster.com/');
+}
+</script>
+</body>
+</html>

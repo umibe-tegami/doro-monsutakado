@@ -1,5 +1,16 @@
 const KEY = 'doro-player-id';
 export function playerId(): string {
+  // Domain handover: when arriving from the old domain with ?pid=,
+  // adopt that player id so progress carries over to the new domain.
+  try {
+    const pid = new URLSearchParams(window.location.search).get('pid');
+    if (pid && /^[A-Za-z0-9-]{8,64}$/.test(pid)) {
+      localStorage.setItem(KEY, pid);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('pid');
+      window.history.replaceState(null, '', url.toString());
+    }
+  } catch { /* ignore */ }
   let id = localStorage.getItem(KEY);
   if (!id) {
     id = (crypto.randomUUID ? crypto.randomUUID() : `p-${Date.now()}-${Math.random().toString(36).slice(2)}`);
