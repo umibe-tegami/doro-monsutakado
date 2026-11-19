@@ -92,6 +92,14 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 .overlay { position: fixed; inset: 0; background: rgba(4,6,16,.78); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
 .announce { width: min(560px, 97vw); border-radius: 16px; padding: 20px 10px; text-align: center; background: linear-gradient(180deg,#232c5e,#121a3d); border: 3px solid #f0b429; box-shadow: 0 0 34px rgba(240,180,41,.45); animation: pop .3s ease; }
 .announce h3 { margin: 0 0 6px; font-size: clamp(17px, 5.1vw, 24px); }
+/* Mode tones: ultra keeps the default gold above. Super = silver
+   (same gradient as the side rails), normal/fall = blue (same palette
+   as the normal mode chip). The 「残念！！」 end card uses tone 'end',
+   which intentionally has no rule here and keeps the default look. */
+.announce.super { border-color: #c8cfd8; box-shadow: 0 0 34px rgba(200,207,216,.45); }
+.announce.super h3 { background-image: linear-gradient(90deg,#ffffff 0%,#d7dce3 30%,#868d98 52%,#eef1f5 74%,#646a73 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.announce.info, .announce.fall { border-color: #3e7cb1; box-shadow: 0 0 34px rgba(77,178,255,.45); }
+.announce.info h3, .announce.fall h3 { color: #7ec3ff; }
 .announce.ultimate { border: 3px solid transparent; background: linear-gradient(180deg,#232c5e,#121a3d) padding-box, linear-gradient(135deg,#ff5f57,#ffb340,#ffe94d,#5fd35f,#4db2ff,#9d6bff,#ff5fa2) border-box; box-shadow: 0 0 34px rgba(157,107,255,.5); }
 .announce.ultimate h3 { background-image: linear-gradient(90deg,#ff5f57,#ffb340,#ffe94d,#5fd35f,#4db2ff,#9d6bff,#ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .announce p { margin: 4px 0; font-size: 14px; line-height: 1.7; color: #dfe6ff; }

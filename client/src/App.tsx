@@ -232,7 +232,7 @@ if (ended) {
 // the revive offer / result flow appears.
 await beat();
 au.playVoice('miss');
-announce({ title: '残念！！', sub: `${B.streak}連チャンで終了`, tone: 'fall'}, END_BEAT_MS);
+announce({ title: '残念！！', sub: `${B.streak}連チャンで終了`, tone: 'end'}, END_BEAT_MS);
 await sleep(END_BEAT_MS);
 setBusy(false);
 if (B.revivesUsed < 2) setShowRevive(true);
