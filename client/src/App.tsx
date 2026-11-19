@@ -521,7 +521,7 @@ const st = await api.customArt(url); setPlayer(st);
 <p className="modehint ultra">3枚ドローとアルティメット昇格を狙え ― 残念でも通常に戻るだけ</p>
 )}
 {battle.mode === 'ultimate' && (
-<p className="modehint ultimate">5枚ドローの大盤振る舞い ― さらに上、ヘブンス昇格の奇跡も</p>
+<p className="modehint ultimate">ディスティニードローを感じろ ― さらに上、ヘブンス昇格の奇跡も</p>
 )}
 {battle.mode === 'heavens' && (
 <p className="modehint heavens">天上モード ― 50%で100枚ドロー！ 降格してもアルティメットへ</p>
