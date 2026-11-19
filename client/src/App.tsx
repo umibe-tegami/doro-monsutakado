@@ -155,7 +155,7 @@ B.streak += ids.length;
 B.damage += 1500 * ids.length;
 B.lastCards = ids;
 B.lastNew = news;
-if (ids.length) au.playVoice('monster');
+if (ids.length) { au.playSe('attack'); au.playVoice('monster'); }
 return ids;
 }, []);
 
@@ -193,6 +193,7 @@ await Promise.all([...jobs, api.awardSouls(100).catch(() => {}), sleep(3000)]);
 setHeavensFlow(null);
 B.streak += 100;
 B.damage += 1500 * 100;
+[0, 140, 280, 420, 560].forEach((d) => window.setTimeout(() => au.playSe('attack'), d));
 const pickups = ids.map((id, i) => ({ id, isNew: results[i].isNew}))
 .filter((c) => ['SR', 'U', 'L', 'GL', 'UL'].includes(SPECIES_MAP.get(c.id)!.rarity));
 const rank = (id: number) => ['N', 'R', 'SR', 'U', 'L', 'GL', 'UL'].indexOf(SPECIES_MAP.get(id)!.rarity);
