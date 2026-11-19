@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState} from 'react';
-import { api, type PlayerState, type Rankings} from './api';
+import { api, playerId, type PlayerState, type Rankings} from './api';
 import {
 SPECIES, SPECIES_MAP, RARITY_MAP, RARITIES, BACKGROUNDS, CARD_BACKS, DEFAULT_BACK,
 drawSpeciesId, formatElapsed, UL_ID,
@@ -45,6 +45,13 @@ const PREMIUM: { id: string; name: string; price: string; url: string; desc: str
 { id: 'souls14000', name: '14,000ソウル', price: '¥2,940', url: 'https://buy.stripe.com/4gM6oH9DtfHK7Rqdn02VG06', desc: ''},
 { id: 'souls30000', name: '30,000ソウル', price: '¥5,860', url: 'https://buy.stripe.com/14A8wPeXNgLOc7G1Ei2VG07', desc: ''},
 ];
+
+// Append the player id so the Stripe webhook can auto-grant the purchase
+// to this player (checkout.session.completed -> client_reference_id).
+function stripeUrl(url: string): string {
+const sep = url.includes('?')? '&': '?';
+return `${url}${sep}client_reference_id=${encodeURIComponent(playerId())}`;
+}
 
 export default function App() {
 const [player, setPlayer] = useState<PlayerState | null>(null);
@@ -681,7 +688,7 @@ return (
 <h4>{it.name} <span className="price">{it.price}</span></h4>
 {it.desc && <p className="note">{it.desc}</p>}
 {owned? <p className="msg ok">所有済み（有効になっています）</p>: (
-<a className="buybtn" href={it.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', textDecoration: 'none'}}>購入する（Stripe）</a>
+<a className="buybtn" href={stripeUrl(it.url)} target="_blank" rel="noreferrer" style={{ display: 'inline-block', textDecoration: 'none'}}>購入する（Stripe）</a>
 )}
 </div>
 );

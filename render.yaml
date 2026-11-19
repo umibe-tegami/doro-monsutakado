@@ -12,6 +12,8 @@ services:
           property: connectionString
       - key: REDEMPTION_CODES_SEED
         sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
 databases:
   - name: doro-monsutakado-db
     plan: basic-256mb

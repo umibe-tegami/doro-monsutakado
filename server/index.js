@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, seedCodes } from './db.js';
+import { stripeWebhookHandler } from './stripe-webhook.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.join(__dirname, '..');
@@ -25,6 +26,9 @@ const seeded = await seedCodes(db);
 if (seeded) console.log(`Seeded ${seeded} redemption codes.`);
 
 const app = express();
+// Stripe webhook needs the raw body for signature verification, so it is
+// mounted with its own raw parser BEFORE the global JSON parser below.
+app.post('/webhooks/stripe', express.raw({ type: 'application/json', limit: '1mb' }), stripeWebhookHandler(db));
 app.use(express.json({ limit: '8mb' }));
 
 function rnd(n) { return Math.floor(Math.random() * n); }

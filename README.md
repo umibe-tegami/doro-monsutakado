@@ -34,6 +34,12 @@ CODES_DIR=/path/to/codes node scripts/make-seed.mjs > seed.json
 `seed.json` は `.gitignore` 済みです。生成したJSONはRenderの環境変数にだけ貼り、
 ファイルはリポジトリにコミットしないでください。
 
+## Stripe Webhook 自動付与
+支払い完了と同時に自動付与する Webhook（`POST /webhooks/stripe`）を実装済みです。
+仕組み・金額対応表・本番化の手順は `docs/webhook.md` を参照。
+環境変数 `STRIPE_WEBHOOK_SECRET` 未設定の間は無効（503）で、
+解除コード方式と併用できます。ローカル検証は `node scripts/test-webhook.mjs`。
+
 ## BGMクレジット
 - 通常： 「戦いの旅路を征く」by MATSU（OpenTracks / 旧DOVA-SYNDROME、商用可・表記不要）
 - アルティメット中： 「Do not go against me」by yourai（同上）

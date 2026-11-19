@@ -50,6 +50,12 @@ const SCHEMA = [
     used_by TEXT,
     used_at BIGINT
   )`,
+  `CREATE TABLE IF NOT EXISTS stripe_events (
+    event_id TEXT PRIMARY KEY,
+    session_id TEXT,
+    result TEXT,
+    processed_at BIGINT NOT NULL
+  )`,
 ];
 // Postgres: AUTOINCREMENT is not valid; swap in SERIAL for the scores table.
 const SCHEMA_PG = SCHEMA.map((s) =>
