@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState} from 'react';
-import { api, playerId, type PlayerState, type Rankings} from './api';
+import { api, playerId, type PlayerState, type Rankings, type Announcement} from './api';
 import {
 SPECIES, SPECIES_MAP, RARITY_MAP, RARITIES, BACKGROUNDS, CARD_BACKS, DEFAULT_BACK,
 drawSpeciesId, formatElapsed, UL_ID,
@@ -9,7 +9,7 @@ import CardBack from './CardBack';
 import * as au from './audio';
 
 type Mode = 'normal' | 'super' | 'ultra' | 'ultimate' | 'heavens';
-type View = 'title' | 'battle' | 'dex' | 'shop' | 'ranking';
+type View = 'title' | 'battle' | 'dex' | 'shop' | 'ranking' | 'notice';
 
 interface Battle {
 active: boolean;
@@ -109,6 +109,13 @@ return st;
 }, []);
 useEffect(() => { refresh().catch(() => {});}, [refresh]);
 
+const [annList, setAnnList] = useState<Announcement[]>([]);
+const loadAnnouncements = useCallback(async () => {
+try { const r = await api.announcements(); setAnnList(r.announcements);} catch { /* ignore */ }
+}, []);
+useEffect(() => { loadAnnouncements();}, [loadAnnouncements]);
+const unreadAnn = annList.filter((a) =>!a.read).length;
+
 useEffect(() => {
 if (battle) localStorage.setItem(BKEY, JSON.stringify(battle));
 }, [battle]);
@@ -141,14 +148,16 @@ window.setTimeout(() => setSkit(-1), lines.length * 1400 + 400);
 }, []);
 
 const drawCards = useCallback(async (n: number, B: Battle, beat: () => Promise<void>) => {
+// Draw bonus (UL soul shop): every monster draw pulls +drawBonus extra cards.
+const total = n + (playerRef.current?.drawBonus || 0);
 const ids: number[] = [];
 const news: boolean[] = [];
-for (let i = 0; i < n; i++) {
+for (let i = 0; i < total; i++) {
 const sid = drawSpeciesId();
 const r = await api.recordDraw(sid);
 ids.push(sid); news.push(r.isNew);
 }
-if (n > 0) await api.awardSouls(n);
+if (total > 0) await api.awardSouls(total);
 // Wait out the draw callout before the result (and its callout) lands.
 await beat();
 B.streak += ids.length;
@@ -452,6 +461,7 @@ return (
 <button className={view === 'dex'? 'on': ''} onClick={() => setView('dex')}>図鑑</button>
 <button className={view === 'shop'? 'on': ''} onClick={() => setView('shop')}>ショップ</button>
 <button className={view === 'ranking'? 'on': ''} onClick={() => setView('ranking')}>ランキング</button>
+<button className={view === 'notice'? 'on': ''} onClick={() => { setView('notice'); loadAnnouncements();}}>お知らせ{unreadAnn > 0 && <span className="tabbadge">{unreadAnn}</span>}</button>
 </div>
 <button className={`iconbtn ${player.bgmEnabled? '': 'off'}`} title="BGM" onClick={async () => { const st = await api.settings({ bgmEnabled:!player.bgmEnabled}); setPlayer(st);}}>♪</button>
 <button className={`iconbtn ${player.voiceMuted? 'off': ''}`} title="ボイス" onClick={async () => { const st = await api.settings({ voiceMuted:!player.voiceMuted}); setPlayer(st); au.setVoiceMuted(st.voiceMuted);}}>声</button>
@@ -633,6 +643,7 @@ return (
 {view === 'dex' && <DexView player={player} refresh={refresh} setPlayer={setPlayer} />}
 {view === 'shop' && <ShopView player={player} refresh={refresh} setPlayer={setPlayer} />}
 {view === 'ranking' && <RankingView player={player} />}
+{view === 'notice' && <NoticeView announcements={annList} reload={loadAnnouncements} refresh={refresh} />}
 
 {ann && (
 <div className="overlay" style={{ pointerEvents: 'none', background: 'transparent'}}>
@@ -821,6 +832,7 @@ return (
 function DexView({ player, refresh, setPlayer}: { player: PlayerState; refresh: () => Promise<PlayerState>; setPlayer: (p: PlayerState) => void}) {
 const [detail, setDetail] = useState<number | null>(null);
 const [confirmSell, setConfirmSell] = useState(false);
+const [confirmExchange, setConfirmExchange] = useState(false);
 const [bulk, setBulk] = useState<{ rarity: string; cards: number; gained: number} | null>(null);
 const [msg, setMsg] = useState('');
 const order = [...RARITIES].reverse();
@@ -898,7 +910,32 @@ await refresh();
 </button>
 )
 )}
-{entry && sp.sellPrice == null && <p className="note">このカードは売却できません。</p>}
+{entry && sp.sellPrice == null && sp.id!== 151 && <p className="note">このカードは売却できません。</p>}
+{entry && sp.id === 151 && (
+<div>
+<p className="note">ULソウル所持：{player.ulSouls}個（ULソウルショップで使えます）</p>
+{entry.count >= 2? (
+confirmExchange? (
+<div>
+<p className="msg err">本当に1枚をULソウル1個に交換しますか？</p>
+<button className="bigbtn" onClick={async () => {
+try {
+await api.exchangeUl();
+setMsg('ULソウルに交換しました');
+setConfirmExchange(false);
+await refresh();
+} catch (err) { setMsg((err as Error).message);}
+}}>はい、交換する</button>
+<button className="subbtn" onClick={() => setConfirmExchange(false)}>やめる</button>
+</div>
+): (
+<button className="bigbtn" onClick={() => setConfirmExchange(true)}>1枚をULソウルに交換する</button>
+)
+): (
+<p className="note">2枚目以降をULソウルに交換できます（最後の1枚は交換できません）。</p>
+)}
+</div>
+)}
 <button className="subbtn" onClick={() => setDetail(null)}>閉じる</button>
 </div>
 </div>
@@ -925,6 +962,52 @@ await refresh();
 );
 }
 
+/* ---------------- お知らせ ---------------- */
+const ATTACH_NAMES: Record<string, string> = { souls: 'ソウル', ul_souls: 'ULソウル', ad_free: '広告無期限廃止', speed_up: 'ドロー速度アップ', auto_draw: 'オートドロー', full_auto: 'フルオートドロー'};
+function NoticeView({ announcements, reload, refresh}: { announcements: Announcement[]; reload: () => Promise<void>; refresh: () => Promise<PlayerState>}) {
+const [openId, setOpenId] = useState<number | null>(null);
+const [msg, setMsg] = useState('');
+const open = announcements.find((a) => a.id === openId) || null;
+const attachText = (a: Announcement) => a.attachType === 'none'? '': (a.attachType === 'souls' || a.attachType === 'ul_souls')? `添付：${ATTACH_NAMES[a.attachType]} ${a.attachAmount}個`: `添付：${ATTACH_NAMES[a.attachType] || a.attachType}`;
+return (
+<div className="view">
+<h2 className="sec">お知らせ</h2>
+{msg && <p className="msg ok">{msg}</p>}
+{announcements.length === 0 && <p className="note">お知らせはまだありません。</p>}
+{announcements.map((a) => (
+<button key={a.id} className="shopitem" style={{ display: 'block', width: '100%', textAlign: 'left'}} onClick={async () => {
+setOpenId(a.id);
+if (!a.read) { try { await api.announcementRead(a.id); await reload();} catch { /* ignore */ } }
+}}>
+<h4>{!a.read && <span className="tabbadge">新着</span>} {a.title}</h4>
+<p className="note">{new Date(a.createdAt).toLocaleDateString('ja-JP')}{attachText(a)? ` ／ ${attachText(a)}`: ''}{a.attachType!== 'none' && a.claimed? ' ／ 受け取り済み': ''}</p>
+</button>
+))}
+{open && (
+<div className="overlay" onClick={() => setOpenId(null)}>
+<div className="modal" onClick={(e) => e.stopPropagation()}>
+<h3>{open.title}</h3>
+<p className="note">{new Date(open.createdAt).toLocaleString('ja-JP')}</p>
+<p style={{ whiteSpace: 'pre-wrap', textAlign: 'left'}}>{open.body}</p>
+{open.attachType!== 'none' && (
+open.claimed? <p className="msg ok">受け取り済みです</p>: (
+<button className="bigbtn" onClick={async () => {
+try {
+const r = await api.announcementClaim(open.id);
+setMsg(r.message);
+await reload(); await refresh();
+} catch (e) { setMsg((e as Error).message);}
+}}>添付アイテムを受け取る（{attachText(open).replace('添付：', '')}）</button>
+)
+)}
+<button className="subbtn" onClick={() => setOpenId(null)}>閉じる</button>
+</div>
+</div>
+)}
+</div>
+);
+}
+
 /* ---------------- ショップ ---------------- */
 const PACK_INFO = [
 { kind: 'normal', name: 'ノーマルパック', price: 100, desc: 'ランダム3枚。ノーマルからアルティメットレジェンドまで全てのレアリティが出ます。'},
@@ -937,6 +1020,8 @@ function ShopView({ player, refresh, setPlayer}: { player: PlayerState; refresh:
 const [msg, setMsg] = useState<{ ok: boolean; text: string} | null>(null);
 const [packResult, setPackResult] = useState<{ speciesId: number; isNew: boolean}[] | null>(null);
 const [code, setCode] = useState('');
+const [appName, setAppName] = useState('');
+const [appDesc, setAppDesc] = useState('');
 const [inqCategory, setInqCategory] = useState('purchase');
 const [inqBody, setInqBody] = useState('');
 const [inqEmail, setInqEmail] = useState('');
@@ -972,6 +1057,32 @@ setPackResult(r.cards.map((c) => ({ speciesId: c.speciesId, isNew: c.isNew})));
 </div>
 );
 })}
+
+<h2 className="sec">ULソウルショップ</h2>
+<p className="note">ULソウルは、アルティメットレジェンドの2枚目以降を図鑑のカード詳細から交換して手に入ります。現在の所持数：<b>{player.ulSouls}個</b></p>
+<div className="shopitem">
+<h4>ドロー+1 <span className="price">ULソウル 1個</span></h4>
+<p className="note">通常ドロー・一気に3枚・一気に5枚の全てに、毎回+1枚追加でドローします。現在：<b>+{player.drawBonus}</b>（最大+10）</p>
+<button className="buybtn" disabled={player.ulSouls < 1 || player.drawBonus >= 10} onClick={() => buy(async () => { await api.buyUlUpgrade('draw');}, 'ドロー+1を強化しました')}>{player.drawBonus >= 10? '最大です': 'ULソウル1個で強化'}</button>
+</div>
+<div className="shopitem">
+<h4>ソウル+1 <span className="price">ULソウル 1個</span></h4>
+<p className="note">ドローや売却など、全てのソウル獲得が1枚ごとに+1されます。現在：<b>+{player.soulBonus}</b>（最大+10）</p>
+<button className="buybtn" disabled={player.ulSouls < 1 || player.soulBonus >= 10} onClick={() => buy(async () => { await api.buyUlUpgrade('soul');}, 'ソウル+1を強化しました')}>{player.soulBonus >= 10? '最大です': 'ULソウル1個で強化'}</button>
+</div>
+<div className="shopitem">
+<h4>あなたのモンスターをアルティメットレジェンドに追加 <span className="price">ULソウル 3個で応募</span></h4>
+<p className="note">ご希望のモンスターを、新しいアルティメットレジェンドとして追加する応募ができます。</p>
+<div className="inqform">
+<input placeholder="モンスターの名前（30字まで）" maxLength={30} value={appName} onChange={(e) => setAppName(e.target.value)} />
+<textarea placeholder="カードの説明（500字まで）" maxLength={500} rows={4} value={appDesc} onChange={(e) => setAppDesc(e.target.value)} />
+</div>
+<p className="note">応募の際のお願い：個人情報（本名・住所・電話番号・メールアドレスなど）や、下ネタ・公序良俗に反する内容は送らないでください。それ以外のアイデアは、できる限り採用します。カードの絵は、いただいた名前と説明をもとに、こちらで想像して描きます。</p>
+<button className="buybtn" disabled={player.ulSouls < 3 ||!appName.trim() ||!appDesc.trim()} onClick={() => buy(async () => {
+await api.applyUlMonster(appName.trim(), appDesc.trim());
+setAppName(''); setAppDesc('');
+}, '応募しました。ありがとうございます！')}>ULソウル3個で応募する</button>
+</div>
 
 <h2 className="sec">対戦背景（各500ソウル）</h2>
 <div className="cosgrid">

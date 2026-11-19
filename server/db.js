@@ -24,6 +24,9 @@ const SCHEMA = [
     fa_revive2 TEXT NOT NULL DEFAULT 'ad',
     bgm_enabled INTEGER NOT NULL DEFAULT 1,
     voice_muted INTEGER NOT NULL DEFAULT 0,
+    ul_souls INTEGER NOT NULL DEFAULT 0,
+    draw_bonus INTEGER NOT NULL DEFAULT 0,
+    soul_bonus INTEGER NOT NULL DEFAULT 0,
     selected_bg TEXT NOT NULL DEFAULT 'default',
     selected_back TEXT NOT NULL DEFAULT 'default',
     custom_art TEXT,
@@ -64,6 +67,35 @@ const SCHEMA = [
     result TEXT,
     processed_at BIGINT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS ul_applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    handled INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    attach_type TEXT NOT NULL DEFAULT 'none',
+    attach_amount INTEGER NOT NULL DEFAULT 0,
+    created_at BIGINT NOT NULL,
+    expires_at BIGINT
+  )`,
+  `CREATE TABLE IF NOT EXISTS announcement_reads (
+    announcement_id INTEGER NOT NULL,
+    player_id TEXT NOT NULL,
+    read_at BIGINT NOT NULL,
+    PRIMARY KEY (announcement_id, player_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS announcement_claims (
+    announcement_id INTEGER NOT NULL,
+    player_id TEXT NOT NULL,
+    claimed_at BIGINT NOT NULL,
+    PRIMARY KEY (announcement_id, player_id)
+  )`,
   `CREATE TABLE IF NOT EXISTS inquiries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_id TEXT NOT NULL,
@@ -90,6 +122,9 @@ const PLAYER_MIGRATIONS = [
   ['play_mode', "TEXT NOT NULL DEFAULT 'manual'"],
   ['fa_revive1', "TEXT NOT NULL DEFAULT 'ad'"],
   ['fa_revive2', "TEXT NOT NULL DEFAULT 'ad'"],
+  ['ul_souls', 'INTEGER NOT NULL DEFAULT 0'],
+  ['draw_bonus', 'INTEGER NOT NULL DEFAULT 0'],
+  ['soul_bonus', 'INTEGER NOT NULL DEFAULT 0'],
 ];
 
 class PgDb {

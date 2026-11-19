@@ -212,3 +212,6 @@ table.rank tr.me { background: rgba(240,180,41,.14); font-weight: 800; }
 .inqform select, .inqform input, .inqform textarea { padding: 11px; border-radius: 10px; border: 1px solid #3a4a8f; background: #0d1130; color: #fff; font-size: 15px; font-family: inherit; }
 .inqform textarea { min-height: 96px; resize: vertical; line-height: 1.6; }
 .inqform .buybtn { align-self: flex-start; }
+
+.tabbadge { display: inline-block; min-width: 18px; padding: 1px 5px; margin-left: 4px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 11px; font-weight: 800; text-align: center; vertical-align: 2px; }
+h4 .tabbadge { margin: 0 4px 0 0; }

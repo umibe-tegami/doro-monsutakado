@@ -12,6 +12,7 @@ export interface CollectionEntry { count: number; firstGotAt: number | null }
 export interface PlayerState {
   playerId: string; name: string; souls: number; lifetimeSouls: number;
   adFree: boolean; speedUp: boolean; autoDraw: boolean; fullAuto: boolean; tester: boolean;
+  ulSouls: number; drawBonus: number; soulBonus: number;
   speedFast: boolean; playMode: 'manual' | 'auto' | 'fullauto';
   faRevive1: 'souls' | 'ad' | 'end'; faRevive2: 'ad' | 'end';
   bgmEnabled: boolean; voiceMuted: boolean;
@@ -50,7 +51,20 @@ export const api = {
   rankings: () => post<Rankings>('/api/rankings'),
   settings: (s: { bgmEnabled?: boolean; voiceMuted?: boolean; speedFast?: boolean; playMode?: string; faRevive1?: string; faRevive2?: string }) => post<PlayerState>('/api/settings', s),
   customArt: (dataUrl: string | null) => post<PlayerState>('/api/custom-art', { dataUrl }),
+  exchangeUl: () => post<{ ulSouls: number; count: number }>('/api/exchange-ul'),
+  buyUlUpgrade: (kind: 'draw' | 'soul') => post<{ ulSouls: number; drawBonus: number; soulBonus: number }>('/api/buy-ul-upgrade', { kind }),
+  applyUlMonster: (name: string, description: string) => post<{ ok: boolean; ulSouls: number }>('/api/apply-ul-monster', { name, description }),
+  announcements: () => post<{ announcements: Announcement[] }>('/api/announcements'),
+  announcementRead: (announcementId: number) => post<{ ok: boolean }>('/api/announcements/read', { announcementId }),
+  announcementClaim: (announcementId: number) => post<{ ok: boolean; message: string }>('/api/announcements/claim', { announcementId }),
 };
+
+export interface Announcement {
+  id: number; title: string; body: string;
+  attachType: string; attachAmount: number;
+  createdAt: number; expiresAt: number | null;
+  read: boolean; claimed: boolean;
+}
 
 export interface RankEntry { rank: number; name: string; streak: number; lifetimeSouls: number; compElapsedMs: number | null; isMe?: boolean }
 export interface RankingSet { top: RankEntry[]; own: RankEntry | null }

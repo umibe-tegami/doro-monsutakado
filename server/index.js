@@ -97,6 +97,9 @@ async function playerState(id) {
     autoDraw: !!Number(p.auto_draw),
     fullAuto: !!Number(p.full_auto),
     tester: !!Number(p.tester),
+    ulSouls: Number(p.ul_souls || 0),
+    drawBonus: Number(p.draw_bonus || 0),
+    soulBonus: Number(p.soul_bonus || 0),
     speedFast: !!Number(p.speed_fast),
     playMode: ['auto', 'fullauto'].includes(p.play_mode) ? p.play_mode : 'manual',
     faRevive1: ['souls', 'ad', 'end'].includes(p.fa_revive1) ? p.fa_revive1 : 'ad',
@@ -146,8 +149,10 @@ app.post('/api/record-draws', async (req, res) => {
 
 app.post('/api/award-souls', async (req, res) => {
   const id = needPlayer(req, res); if (!id) return;
-  const amount = Math.max(0, Math.min(1000, Number(req.body.amount) || 0));
-  await getPlayer(id);
+  const cards = Math.max(0, Math.min(1000, Number(req.body.amount) || 0));
+  const p0 = await getPlayer(id);
+  // Soul bonus (UL soul shop): every card drawn yields 1 + soulBonus souls.
+  const amount = cards * (1 + Number(p0.soul_bonus || 0));
   await db.run('UPDATE players SET souls = souls + $1, lifetime_souls = lifetime_souls + $1 WHERE id = $2', [amount, id]);
   const p = await getPlayer(id);
   res.json({ souls: Number(p.souls), lifetimeSouls: Number(p.lifetime_souls) });
@@ -171,9 +176,11 @@ app.post('/api/sell-card', async (req, res) => {
   const row = await db.one('SELECT cnt FROM collection WHERE player_id = $1 AND species_id = $2', [id, speciesId]);
   if (!row || Number(row.cnt) <= 1) return res.status(400).json({ error: '各種の最後の1枚は売れません' });
   await db.run('UPDATE collection SET cnt = cnt - 1 WHERE player_id = $1 AND species_id = $2', [id, speciesId]);
-  await db.run('UPDATE players SET souls = souls + $1 WHERE id = $2', [sp.sellPrice, id]);
+  const p0 = await getPlayer(id);
+  const gained = sp.sellPrice + Number(p0.soul_bonus || 0);
+  await db.run('UPDATE players SET souls = souls + $1 WHERE id = $2', [gained, id]);
   const p = await getPlayer(id);
-  res.json({ souls: Number(p.souls), count: Number(row.cnt) - 1, gained: sp.sellPrice });
+  res.json({ souls: Number(p.souls), count: Number(row.cnt) - 1, gained });
 });
 
 app.post('/api/sell-duplicates', async (req, res) => {
@@ -190,6 +197,8 @@ app.post('/api/sell-duplicates', async (req, res) => {
     await db.run('UPDATE collection SET cnt = 1 WHERE player_id = $1 AND species_id = $2', [id, r.species_id]);
   }
   if (cards === 0) return res.status(400).json({ error: '売れるカードがありません' });
+  const p0 = await getPlayer(id);
+  gained += Number(p0.soul_bonus || 0) * cards;
   await db.run('UPDATE players SET souls = souls + $1 WHERE id = $2', [gained, id]);
   const p = await getPlayer(id);
   res.json({ souls: Number(p.souls), cards, gained });
@@ -206,7 +215,114 @@ app.post('/api/sell-duplicates-preview', async (req, res) => {
     if (!sp || sp.rarity !== rarity) continue;
     cards += Number(r.cnt) - 1; gained += (Number(r.cnt) - 1) * sp.sellPrice;
   }
+  const p0 = await getPlayer(id);
+  gained += Number(p0.soul_bonus || 0) * cards;
   res.json({ cards, gained });
+});
+
+// ---- UL souls: exchange duplicate UL cards, spend on permanent upgrades,
+// and apply (3 UL souls) to have a wished monster added as a new UL. ----
+app.post('/api/exchange-ul', async (req, res) => {
+  const id = needPlayer(req, res); if (!id) return;
+  const row = await db.one('SELECT cnt FROM collection WHERE player_id = $1 AND species_id = $2', [id, UL_ID]);
+  if (!row || Number(row.cnt) <= 1) return res.status(400).json({ error: '交換できるアルティメットレジェンドがありません（最後の1枚は交換できません）' });
+  await db.run('UPDATE collection SET cnt = cnt - 1 WHERE player_id = $1 AND species_id = $2', [id, UL_ID]);
+  await db.run('UPDATE players SET ul_souls = ul_souls + 1 WHERE id = $1', [id]);
+  const p = await getPlayer(id);
+  res.json({ ulSouls: Number(p.ul_souls), count: Number(row.cnt) - 1 });
+});
+
+app.post('/api/buy-ul-upgrade', async (req, res) => {
+  const id = needPlayer(req, res); if (!id) return;
+  const kind = String(req.body.kind || '');
+  const col = kind === 'draw' ? 'draw_bonus' : kind === 'soul' ? 'soul_bonus' : null;
+  if (!col) return res.status(400).json({ error: 'unknown upgrade' });
+  const p = await getPlayer(id);
+  if (Number(p[col]) >= 10) return res.status(400).json({ error: 'すでに最大（+10）です' });
+  if (Number(p.ul_souls) < 1) return res.status(400).json({ error: 'ULソウルが足りません' });
+  await db.run(`UPDATE players SET ul_souls = ul_souls - 1, ${col} = ${col} + 1 WHERE id = $1`, [id]);
+  const after = await getPlayer(id);
+  res.json({ ulSouls: Number(after.ul_souls), drawBonus: Number(after.draw_bonus), soulBonus: Number(after.soul_bonus) });
+});
+
+app.post('/api/apply-ul-monster', async (req, res) => {
+  const id = needPlayer(req, res); if (!id) return;
+  const name = String(req.body.name || '').trim().slice(0, 30);
+  const description = String(req.body.description || '').trim().slice(0, 500);
+  if (!name || !description) return res.status(400).json({ error: '名前とカードの説明を入力してください' });
+  const p = await getPlayer(id);
+  if (Number(p.ul_souls) < 3) return res.status(400).json({ error: 'ULソウルが3個必要です' });
+  await db.run('UPDATE players SET ul_souls = ul_souls - 3 WHERE id = $1', [id]);
+  await db.run('INSERT INTO ul_applications (player_id, name, description, created_at) VALUES ($1, $2, $3, $4)', [id, name, description, Date.now()]);
+  const after = await getPlayer(id);
+  res.json({ ok: true, ulSouls: Number(after.ul_souls) });
+});
+
+// ---- Operator announcements (in-game mail). Players list / read / claim;
+// creation is admin-only via /api/admin/announce with ADMIN_KEY. ----
+const ATTACH_LABELS = { souls: 'ソウル', ul_souls: 'ULソウル', ad_free: '広告無期限廃止', speed_up: 'ドロー速度アップ', auto_draw: 'オートドロー', full_auto: 'フルオートドロー' };
+
+app.post('/api/announcements', async (req, res) => {
+  const id = needPlayer(req, res); if (!id) return;
+  await getPlayer(id);
+  const now = Date.now();
+  const rows = await db.all('SELECT * FROM announcements WHERE expires_at IS NULL OR expires_at > $1 ORDER BY id DESC LIMIT 50', [now]);
+  const reads = new Set((await db.all('SELECT announcement_id FROM announcement_reads WHERE player_id = $1', [id])).map((r) => Number(r.announcement_id)));
+  const claims = new Set((await db.all('SELECT announcement_id FROM announcement_claims WHERE player_id = $1', [id])).map((r) => Number(r.announcement_id)));
+  res.json({
+    announcements: rows.map((a) => ({
+      id: Number(a.id), title: a.title, body: a.body,
+      attachType: a.attach_type, attachAmount: Number(a.attach_amount),
+      createdAt: Number(a.created_at), expiresAt: a.expires_at ? Number(a.expires_at) : null,
+      read: reads.has(Number(a.id)), claimed: claims.has(Number(a.id)),
+    })),
+  });
+});
+
+app.post('/api/announcements/read', async (req, res) => {
+  const id = needPlayer(req, res); if (!id) return;
+  const aid = Number(req.body.announcementId);
+  if (!aid) return res.status(400).json({ error: 'announcementId required' });
+  const exists = await db.one('SELECT announcement_id FROM announcement_reads WHERE announcement_id = $1 AND player_id = $2', [aid, id]);
+  if (!exists) await db.run('INSERT INTO announcement_reads (announcement_id, player_id, read_at) VALUES ($1, $2, $3)', [aid, id, Date.now()]);
+  res.json({ ok: true });
+});
+
+app.post('/api/announcements/claim', async (req, res) => {
+  const id = needPlayer(req, res); if (!id) return;
+  const aid = Number(req.body.announcementId);
+  const a = await db.one('SELECT * FROM announcements WHERE id = $1', [aid]);
+  if (!a) return res.status(404).json({ error: 'お知らせが見つかりません' });
+  if (a.expires_at && Number(a.expires_at) <= Date.now()) return res.status(400).json({ error: '受け取り期限が過ぎています' });
+  if (!a.attach_type || a.attach_type === 'none') return res.status(400).json({ error: '添付アイテムがありません' });
+  const claimed = await db.one('SELECT announcement_id FROM announcement_claims WHERE announcement_id = $1 AND player_id = $2', [aid, id]);
+  if (claimed) return res.status(400).json({ error: 'すでに受け取り済みです' });
+  await db.run('INSERT INTO announcement_claims (announcement_id, player_id, claimed_at) VALUES ($1, $2, $3)', [aid, id, Date.now()]);
+  const amt = Number(a.attach_amount || 0);
+  if (a.attach_type === 'souls') await db.run('UPDATE players SET souls = souls + $1, lifetime_souls = lifetime_souls + $1 WHERE id = $2', [amt, id]);
+  else if (a.attach_type === 'ul_souls') await db.run('UPDATE players SET ul_souls = ul_souls + $1 WHERE id = $2', [amt, id]);
+  else if (a.attach_type === 'ad_free') await db.run('UPDATE players SET ad_free = 1 WHERE id = $1', [id]);
+  else if (a.attach_type === 'speed_up') await db.run('UPDATE players SET speed_up = 1, speed_fast = 1 WHERE id = $1', [id]);
+  else if (a.attach_type === 'auto_draw') await db.run('UPDATE players SET auto_draw = 1 WHERE id = $1', [id]);
+  else if (a.attach_type === 'full_auto') await db.run('UPDATE players SET full_auto = 1 WHERE id = $1', [id]);
+  else return res.status(400).json({ error: '不明な添付アイテムです' });
+  const label = ATTACH_LABELS[a.attach_type] || a.attach_type;
+  res.json({ ok: true, message: `${label}${a.attach_type === 'souls' || a.attach_type === 'ul_souls' ? ` ${amt}個` : ''}を受け取りました` });
+});
+
+app.post('/api/admin/announce', async (req, res) => {
+  const key = process.env.ADMIN_KEY || '';
+  if (!key) return res.status(503).json({ error: 'admin disabled' });
+  if (String(req.body.key || '') !== key) return res.status(403).json({ error: 'forbidden' });
+  const title = String(req.body.title || '').trim().slice(0, 100);
+  const body = String(req.body.body || '').trim().slice(0, 2000);
+  if (!title || !body) return res.status(400).json({ error: 'title and body required' });
+  const attachType = ['none', 'souls', 'ul_souls', 'ad_free', 'speed_up', 'auto_draw', 'full_auto'].includes(String(req.body.attachType)) ? String(req.body.attachType) : 'none';
+  const attachAmount = Math.max(0, Math.min(1000000, Number(req.body.attachAmount) || 0));
+  const expiresDays = Number(req.body.expiresDays) || 0;
+  const expiresAt = expiresDays > 0 ? Date.now() + expiresDays * 86400000 : null;
+  await db.run('INSERT INTO announcements (title, body, attach_type, attach_amount, created_at, expires_at) VALUES ($1, $2, $3, $4, $5, $6)', [title, body, attachType, attachAmount, Date.now(), expiresAt]);
+  res.json({ ok: true });
 });
 
 const PACKS = {
