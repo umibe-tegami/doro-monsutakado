@@ -66,7 +66,29 @@ export function playBgm(track: 'normal' | 'ultimate' | 'heavens') {
     }
     const src = `/media/bgm/${track}.mp3`;
     if (!bgmEl.src.endsWith(src)) bgmEl.src = src;
+    if (typeof document !== 'undefined' && document.hidden) { bgmSuspended = true; return; }
     bgmEl.play().catch(() => {});
   } catch { /* ignore */ }
 }
 export function stopBgm() { try { bgmEl && bgmEl.pause(); } catch { /* ignore */ } }
+
+// When the tab/app goes to the background (task switch, home screen),
+// pause the BGM and any callout; resume the BGM when the player comes
+// back — but only if it was actually playing when hidden.
+let bgmSuspended = false;
+function suspendAudio() {
+  bgmSuspended = !!(bgmEl && !bgmEl.paused);
+  try { bgmEl && bgmEl.pause(); } catch { /* ignore */ }
+  stopVoice();
+}
+function resumeAudio() {
+  if (bgmSuspended && bgmEnabled && bgmEl) { bgmEl.play().catch(() => {}); }
+  bgmSuspended = false;
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) suspendAudio(); else resumeAudio();
+  });
+  window.addEventListener('pagehide', suspendAudio);
+  window.addEventListener('pageshow', resumeAudio);
+}
