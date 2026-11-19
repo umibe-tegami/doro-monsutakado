@@ -23,15 +23,15 @@ function mulberry32(seed: number) {
 }
 
 export default function MonsterArt({ species, silhouette = false }: { species: Species; silhouette?: boolean }) {
-  // Ultimate Legend (No.151): the portrait fills the art frame.
+  // Ultimate Legend (No.151): the portrait is a tall 1:2 image, so it is
+  // shown whole (contain) over a blurred copy of itself that fills the
+  // frame — cover-cropping it cut off the horns and lower body.
   if (species.id === 151 && !silhouette) {
     return (
-      <img
-        src="/media/ultimate.webp"
-        alt={species.name}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        draggable={false}
-      />
+      <div className="ultimate-art">
+        <img className="ultimate-art-bg" src="/media/ultimate.webp" alt="" aria-hidden draggable={false} />
+        <img className="ultimate-art-fg" src="/media/ultimate.webp" alt={species.name} draggable={false} />
+      </div>
     );
   }
   const rnd = mulberry32(species.seed);

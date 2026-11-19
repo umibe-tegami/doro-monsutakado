@@ -690,7 +690,7 @@ return (
 {sp && (
 <div className="overlay" onClick={() => setDetail(null)}>
 <div className="modal" onClick={(e) => e.stopPropagation()}>
-<div className="detail-art" style={{ borderColor: RARITY_MAP.get(sp.rarity)!.frame}}>
+<div className={`detail-art${sp.id === 151 && entry? ' ultimate-frame': ''}`} style={{ borderColor: RARITY_MAP.get(sp.rarity)!.frame}}>
 <MonsterArt species={sp} silhouette={!entry} />
 </div>
 <h3 style={{ marginBottom: 4}}>No.{sp.id} {entry? sp.name: '？？？'}</h3>
