@@ -69,9 +69,9 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
    readable over the bright arena background. */
 .dmgline { margin: 8px 0 0; text-align: center; font-size: 12.5px; font-weight: 700; line-height: 1.6; color: #ffffff; background: rgba(23,29,61,.88); border: 1px solid #33407a; border-radius: 10px; padding: 7px 10px; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
 /* Revive dialog: the restart mode is pitched as a headline banner. */
-.revive-mode { margin: 10px 0; text-align: center; font-size: 19px; font-weight: 900; line-height: 1.5; border-radius: 12px; padding: 10px 12px; border: 2px solid; }
-.revive-mode.normal { background: #1d3a52; color: #bfe0ff; border-color: #3e7cb1; }
-.revive-mode.ultra { background: #5c430a; color: #ffd94d; border-color: #f0b429; box-shadow: 0 0 18px rgba(240,180,41,.45); }
+.revive-em { font-weight: 900; font-size: 1.15em; }
+.revive-em.normal { color: #7ec3ff; }
+.revive-em.ultra { color: #ffd94d; text-shadow: 0 0 12px rgba(240,180,41,.6); }
 .field { display: flex; gap: 8px; justify-content: center; align-items: stretch; min-height: 196px; margin: 10px 0; flex-wrap: wrap; }
 .moncard { width: 128px; border-radius: 12px; padding: 6px; background: #141a36; border: 3px solid #666; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
 .moncard .art { height: 104px; border-radius: 8px; overflow: hidden; background: #0a0d20; }
@@ -90,8 +90,10 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 
 /* overlays */
 .overlay { position: fixed; inset: 0; background: rgba(4,6,16,.78); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-.announce { width: min(480px, 92vw); border-radius: 16px; padding: 20px 18px; text-align: center; background: linear-gradient(180deg,#232c5e,#121a3d); border: 3px solid #f0b429; box-shadow: 0 0 34px rgba(240,180,41,.45); animation: pop .3s ease; }
-.announce h3 { margin: 0 0 6px; font-size: 24px; }
+.announce { width: min(560px, 97vw); border-radius: 16px; padding: 20px 10px; text-align: center; background: linear-gradient(180deg,#232c5e,#121a3d); border: 3px solid #f0b429; box-shadow: 0 0 34px rgba(240,180,41,.45); animation: pop .3s ease; }
+.announce h3 { margin: 0 0 6px; font-size: clamp(17px, 5.1vw, 24px); }
+.announce.ultimate { border: 3px solid transparent; background: linear-gradient(180deg,#232c5e,#121a3d) padding-box, linear-gradient(135deg,#ff5f57,#ffb340,#ffe94d,#5fd35f,#4db2ff,#9d6bff,#ff5fa2) border-box; box-shadow: 0 0 34px rgba(157,107,255,.5); }
+.announce.ultimate h3 { background-image: linear-gradient(90deg,#ff5f57,#ffb340,#ffe94d,#5fd35f,#4db2ff,#9d6bff,#ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .announce p { margin: 4px 0; font-size: 14px; line-height: 1.7; color: #dfe6ff; }
 .modal { width: min(520px, 94vw); max-height: 88dvh; overflow-y: auto; border-radius: 16px; background: #151b38; border: 1px solid #3a4a8f; padding: 16px; }
 .modal h3 { margin-top: 0; }

@@ -214,7 +214,7 @@ const guaranteed = B.guarantee > 0;
 if (B.guarantee > 0) B.guarantee -= 1;
 const r = Math.random();
 if (r < 0.30) await drawCards(1, B, beat);
-else if (r < 0.90) { await drawCards(5, B, beat); showNotice('一気に5枚ドロー！！', 'up');}
+else if (r < 0.90) { await drawCards(5, B, beat); showNotice('アルティメットドローで5枚引け！！', 'up');}
 else if (guaranteed) await drawCards(1, B, beat);
 else {
 await beat();
@@ -405,7 +405,7 @@ return (
 
 {ann && (
 <div className="overlay" style={{ pointerEvents: 'none', background: 'transparent'}}>
-<div className="announce">
+<div className={`announce ${ann.tone}`}>
 <h3>{ann.title}</h3>
 {ann.sub && <p>{ann.sub}</p>}
 </div>
@@ -432,12 +432,11 @@ return (
 <div className="overlay">
 <div className="modal">
 <h3>残念…！ でも、まだ終われない</h3>
-<p className="note">自己蘇生 {battle.revivesUsed + 1} 回目（最大2回）。連チャンとダメージは継続します。</p>
-{battle.revivesUsed === 0? (
-<p className="revive-mode normal">通常モードから再開！</p>
+<p className="note">自己蘇生 {battle.revivesUsed + 1} 回目（最大2回）。連チャンとダメージは継続します。{battle.revivesUsed === 0? (
+<span className="revive-em normal">通常モードから再開！</span>
 ): (
-<p className="revive-mode ultra">ウルトラモンスターカードドローモードから再開！</p>
-)}
+<span className="revive-em ultra">ウルトラモンスターカードドローモードから再開！</span>
+)}</p>
 {battle.revivesUsed === 0 &&!player.adFree && (
 <button className="bigbtn" disabled={player.souls < 100} onClick={() => doRevive('souls')}>100ソウルで自己蘇生（残り {player.souls}）</button>
 )}
