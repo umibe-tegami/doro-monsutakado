@@ -324,6 +324,22 @@ app.post('/api/redeem-code', async (req, res) => {
   res.json({ item, message, souls: st.souls, adFree: st.adFree, speedUp: st.speedUp, autoDraw: st.autoDraw, fullAuto: st.fullAuto });
 });
 
+const INQUIRY_CATEGORIES = ['purchase', 'bug', 'other'];
+
+app.post('/api/inquiries', async (req, res) => {
+  const id = needPlayer(req, res); if (!id) return;
+  const category = INQUIRY_CATEGORIES.includes(req.body.category) ? req.body.category : null;
+  const body = String(req.body.body || '').trim().slice(0, 1000);
+  const email = String(req.body.email || '').trim().slice(0, 120);
+  if (!category) return res.status(400).json({ error: '種類を選んでください' });
+  if (!body) return res.status(400).json({ error: '内容を入力してください' });
+  const last = await db.one('SELECT created_at FROM inquiries WHERE player_id = $1 ORDER BY id DESC LIMIT 1', [id]);
+  if (last && Date.now() - Number(last.created_at) < 60000) return res.status(429).json({ error: '送信が続いています。少し時間を置いてください' });
+  await getPlayer(id);
+  await db.run('INSERT INTO inquiries (player_id, category, body, reply_email, created_at) VALUES ($1, $2, $3, $4, $5)', [id, category, body, email || null, Date.now()]);
+  res.json({ ok: true, message: '送信しました。ありがとうございます。' });
+});
+
 app.post('/api/submit-score', async (req, res) => {
   const id = needPlayer(req, res); if (!id) return;
   const name = String(req.body.name || '名無し').slice(0, 20);

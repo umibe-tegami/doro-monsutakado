@@ -936,6 +936,9 @@ function ShopView({ player, refresh, setPlayer}: { player: PlayerState; refresh:
 const [msg, setMsg] = useState<{ ok: boolean; text: string} | null>(null);
 const [packResult, setPackResult] = useState<{ speciesId: number; isNew: boolean}[] | null>(null);
 const [code, setCode] = useState('');
+const [inqCategory, setInqCategory] = useState('purchase');
+const [inqBody, setInqBody] = useState('');
+const [inqEmail, setInqEmail] = useState('');
 const allBg = player.ownedBackgrounds.length >= BACKGROUNDS.length;
 const allBack = player.ownedCardBacks.length >= CARD_BACKS.length;
 const unownedLeft = SPECIES.filter((s) => s.id!== UL_ID &&!player.collection[s.id]).length;
@@ -1041,6 +1044,25 @@ const r = await api.redeemCode(code);
 setMsg({ ok: true, text: r.message});
 setCode('');
 }, '')}>入力</button>
+</div>
+
+<h2 className="sec">お問い合わせ</h2>
+<p className="note">ゲーム内からそのまま送れます。購入の反映については、購入したアイテム名とだいたいの時刻を書いていただけると助かります。</p>
+<div className="inqform">
+<select value={inqCategory} onChange={(e) => setInqCategory(e.target.value)}>
+<option value="purchase">購入・反映について</option>
+<option value="bug">不具合の報告</option>
+<option value="other">ご意見・その他</option>
+</select>
+<textarea value={inqBody} onChange={(e) => setInqBody(e.target.value)} maxLength={1000} placeholder="内容を入力してください" />
+<input value={inqEmail} onChange={(e) => setInqEmail(e.target.value)} placeholder="返信先メールアドレス（任意）" />
+<button className="buybtn" onClick={async () => {
+try {
+const r = await api.sendInquiry(inqCategory, inqBody, inqEmail);
+setMsg({ ok: true, text: r.message});
+setInqBody('');
+} catch (e) { setMsg({ ok: false, text: (e as Error).message}); }
+}}>送信する</button>
 </div>
 
 {packResult && (

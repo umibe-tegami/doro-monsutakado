@@ -45,6 +45,7 @@ export const api = {
   buyCosmetic: (kind: string, designId: string) => post<PlayerState>('/api/buy-cosmetic', { kind, designId }),
   selectCosmetic: (kind: string, designId: string) => post<PlayerState>('/api/select-cosmetic', { kind, designId }),
   redeemCode: (code: string) => post<{ item: string; message: string; souls: number }>('/api/redeem-code', { code }),
+  sendInquiry: (category: string, body: string, email: string) => post<{ ok: boolean; message: string }>('/api/inquiries', { category, body, email }),
   submitScore: (name: string, streak: number) => post<{ ok: boolean }>('/api/submit-score', { name, streak }),
   rankings: () => post<Rankings>('/api/rankings'),
   settings: (s: { bgmEnabled?: boolean; voiceMuted?: boolean; speedFast?: boolean; playMode?: string; faRevive1?: string; faRevive2?: string }) => post<PlayerState>('/api/settings', s),

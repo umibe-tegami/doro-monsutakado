@@ -64,6 +64,15 @@ const SCHEMA = [
     result TEXT,
     processed_at BIGINT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS inquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    body TEXT NOT NULL,
+    reply_email TEXT,
+    created_at BIGINT NOT NULL,
+    handled INTEGER NOT NULL DEFAULT 0
+  )`,
 ];
 // Postgres: AUTOINCREMENT is not valid; swap in SERIAL for the scores table.
 const SCHEMA_PG = SCHEMA.map((s) =>

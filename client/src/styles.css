@@ -207,3 +207,8 @@ table.rank tr.me { background: rgba(240,180,41,.14); font-weight: 800; }
 .flowarrow { color: #8fa0d8; font-size: 12.5px; text-align: center; line-height: 1.5; }
 .adbox { text-align: center; padding: 26px 12px; border-radius: 14px; background: #232838; border: 1px solid #4a5468; color: #cfd6e4; font-weight: 700; font-size: 19px; }
 .packresult { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+.inqform { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.inqform select, .inqform input, .inqform textarea { padding: 11px; border-radius: 10px; border: 1px solid #3a4a8f; background: #0d1130; color: #fff; font-size: 15px; font-family: inherit; }
+.inqform textarea { min-height: 96px; resize: vertical; line-height: 1.6; }
+.inqform .buybtn { align-self: flex-start; }
