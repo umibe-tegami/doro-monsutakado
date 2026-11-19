@@ -468,6 +468,7 @@ return (
 </div>
 <div className="soulsbar">
 <span>ソウル <b>{player.souls.toLocaleString()}</b></span>
+<span>ULソウル <b>{player.ulSouls}</b></span>
 <span>図鑑 {Object.keys(player.collection).length} / {SPECIES.length}</span>
 <button className="iconbtn" onClick={() => setShowFlow(true)}>フロー図</button>
 </div>
