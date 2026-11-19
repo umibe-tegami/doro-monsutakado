@@ -2,28 +2,51 @@
 //
 // The shop's payment links carry ?client_reference_id=<playerId>; when a
 // checkout completes, Stripe posts checkout.session.completed here and we
-// grant the purchased item. Grants resolve price-first, amount-second:
-//   1. The session's line-item price IDs are looked up in PRICE_GRANTS.
+// grant the purchased item. Grants resolve in this order:
+//   1. LINK_GRANTS: the session's payment_link ID. The webhook payload
+//      always carries it, so this needs no Stripe API call.
+//   2. PRICE_GRANTS: the session's line-item price IDs (needs line items
+//      embedded in the payload or STRIPE_SECRET_KEY to fetch them).
 //      Several items share the 280 JPY price point (ad-free, speed-up,
-//      auto-draw), so those can ONLY be told apart by price ID.
-//   2. Amounts that belong to exactly one item (the soul packs and the
-//      980 JPY full-auto pass) fall back to STRIPE_GRANTS_JPY.
+//      auto-draw), so those can ONLY be told apart by link or price ID.
+//   3. STRIPE_GRANTS_JPY: amounts that belong to exactly one item (the
+//      soul packs and the 980 / 1080 JPY passes).
 // The manual redemption-code flow stays available in parallel.
 //
 // Disabled unless STRIPE_WEBHOOK_SECRET is set (then requests get 503).
 import crypto from 'node:crypto';
 
-// Price ID -> grant. Register each payment link's price ID here once the
-// links are created in the Stripe dashboard. Until an ID is registered, a
-// purchase of that item cannot be auto-granted by price and is logged.
-//   ad-free (280 JPY) / speed-up (280 JPY) / auto-draw (280 JPY) /
-//   full-auto (980 JPY, also covered by the amount table below) /
-//   duelist pack (1080 JPY, also covered by the amount table below)
+// Payment link ID -> grant. Registered 2026-11-19 when the links were
+// created (the 7 original links by the owner in the dashboard, the 4
+// feature links via the Stripe connector).
+export const LINK_GRANTS = {
+  plink_1UdD0sDmWNBBDQ2EDP3bUAFc: { type: 'ad_free' },
+  plink_1UdN8kDmWNBBDQ2ECJnukVi8: { type: 'speed_up' },
+  plink_1UdN8mDmWNBBDQ2EEqKQs933: { type: 'auto_draw' },
+  plink_1UdN8nDmWNBBDQ2ECbYYLvm7: { type: 'full_auto' },
+  plink_1UdN8oDmWNBBDQ2Ezmu31dEI: { type: 'duelist_pack' },
+  plink_1UdD8sDmWNBBDQ2ED5YlTbFn: { type: 'souls', souls: 300 },
+  plink_1UdDAEDmWNBBDQ2E9w9BRLv5: { type: 'souls', souls: 1000 },
+  plink_1UdDBFDmWNBBDQ2ESc2gIUZh: { type: 'souls', souls: 2500 },
+  plink_1UdDCSDmWNBBDQ2EpmEEg3uC: { type: 'souls', souls: 5500 },
+  plink_1UdDDgDmWNBBDQ2ElfGIs06n: { type: 'souls', souls: 14000 },
+  plink_1UdDEyDmWNBBDQ2EiCaEp4Aa: { type: 'souls', souls: 30000 },
+};
+
+// Price ID -> grant (same items as LINK_GRANTS; kept as a second net for
+// sessions that arrive without a payment_link ID but with line items).
 export const PRICE_GRANTS = {
-  // 'price_...': { type: 'ad_free' },
-  // 'price_...': { type: 'speed_up' },
-  // 'price_...': { type: 'auto_draw' },
-  // 'price_...': { type: 'full_auto' },
+  price_1UdD0UDmWNBBDQ2EwSGnLhir: { type: 'ad_free' },
+  price_1UdN85DmWNBBDQ2EIVCT1ZiX: { type: 'speed_up' },
+  price_1UdN89DmWNBBDQ2EcQ1UIZvT: { type: 'auto_draw' },
+  price_1UdN8BDmWNBBDQ2E3gUbfDcf: { type: 'full_auto' },
+  price_1UdN8CDmWNBBDQ2ETQ105Sti: { type: 'duelist_pack' },
+  price_1UdD8nDmWNBBDQ2EBRJRAGaj: { type: 'souls', souls: 300 },
+  price_1UdDAADmWNBBDQ2ESPHWEXVl: { type: 'souls', souls: 1000 },
+  price_1UdDBADmWNBBDQ2EfiWCzvtB: { type: 'souls', souls: 2500 },
+  price_1UdDCPDmWNBBDQ2EBm3xr7VS: { type: 'souls', souls: 5500 },
+  price_1UdDDdDmWNBBDQ2ESbqm5LHI: { type: 'souls', souls: 14000 },
+  price_1UdDElDmWNBBDQ2EgwRm7Qas: { type: 'souls', souls: 30000 },
 };
 
 // Grant types usable from PRICE_GRANTS and the STRIPE_PRICE_GRANTS override.
@@ -204,12 +227,17 @@ export function stripeWebhookHandler(db) {
       await record('skipped:currency');
       return res.json({ received: true, granted: false });
     }
-    // Price IDs first (the only way to tell the 280 JPY items apart),
-    // then the unique-amount table.
+    // Payment link ID first (always in the payload), then price IDs
+    // (the only other way to tell the 280 JPY items apart), then the
+    // unique-amount table.
     const priceGrants = { ...envPriceGrants(), ...PRICE_GRANTS };
     let grant = null;
     let via = null;
-    for (const priceId of await sessionPriceIds(session)) {
+    if (session.payment_link && LINK_GRANTS[session.payment_link]) {
+      grant = LINK_GRANTS[session.payment_link];
+      via = `link:${session.payment_link}`;
+    }
+    for (const priceId of grant ? [] : await sessionPriceIds(session)) {
       if (priceGrants[priceId]) { grant = priceGrants[priceId]; via = `price:${priceId}`; break; }
     }
     if (!grant) {

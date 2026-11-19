@@ -10,30 +10,24 @@
 2. 支払いが完了すると Stripe が `POST /webhooks/stripe` に
    `checkout.session.completed` イベントを送ります。
 3. サーバーは署名を検証し、`client_reference_id` のプレイヤーへ、
-   購入したアイテムを付与します。付与内容の判定は **price ID が優先**、
-   金額は補助です（次節）。
+   購入したアイテムを付与します。付与内容の判定は **支払いリンクID
+   （`LINK_GRANTS`）→ price ID → 金額** の順です（次節）。
 
 ## 付与内容の判定（price ID 優先）
 
-`server/stripe-webhook.js` の `PRICE_GRANTS`（price ID → 付与内容）が
-第一の対応表です。280円のアイテムは3つあり（広告無期限廃止／
-ドロー速度アップ／オートドロー）、**金額だけでは判別できない**ため、
-この3つは price ID でしか付与できません。サーバーはセッションの
-line items から price ID を取得します（Webhookのペイロードには通常
-含まれないため、`STRIPE_SECRET_KEY` が設定されていれば Stripe API
-から取得します）。
+第一の対応表は `server/stripe-webhook.js` の `LINK_GRANTS`
+（支払いリンクID → 付与内容）です。セッションのペイロードには
+`payment_link` が常に含まれるため、Stripe API を呼ばずに判定できます。
+280円のアイテムは3つあり（広告無期限廃止／ドロー速度アップ／
+オートドロー）、**金額だけでは判別できない**ため、この3つはリンクID
+（または price ID）でしか付与できません。第二の対応表 `PRICE_GRANTS`
+（price ID → 付与内容）も全リンク分を登録済みで、line items が
+ペイロードに含まれる場合や `STRIPE_SECRET_KEY` 設定時に機能します。
 
-> **Stripe一括作業の際にやること**：新しく作る支払いリンク5件
-> （広告無期限廃止・ドロー速度アップ・オートドロー・フルオートドロー・
-> デュエリストパック）について、各リンクの **price ID を
-> `PRICE_GRANTS` へ登録** してください。登録されていない price ID の
-> 購入は自動付与されず、サーバーログと `stripe_events.result`
-> （`skipped:unknown_amount`）に残ります。あわせて、サーバーの
-> 環境変数に `STRIPE_SECRET_KEY`（line items 取得用）を設定して
-> ください。
-> ※デュエリストパック（1,080円）とフルオートドロー（980円）は金額が
-> 一意なため、下記の金額対応表でも自動付与されます（price ID 登録は
-> 確実を期すための二重化です）。
+> **2026-11-19 本番化完了**：Webhookエンドポイント登録・署名シークレット
+> 設定・全11リンクの LINK_GRANTS／PRICE_GRANTS 登録・新4リンク作成・
+> 2ドローパスリンク無効化・全リンクの確認メッセージ更新まで実施済み。
+> `STRIPE_SECRET_KEY` は未設定（リンクID判定で不要なため）。
 
 金額だけで判別できるもの（その金額のアイテムが1つだけのもの）は、
 `STRIPE_GRANTS_JPY`（金額 → 付与内容）で付与されます。
@@ -80,7 +74,7 @@ node scripts/test-webhook.mjs
 実Stripeには接続しません（price ID の対応付けはテスト用の
 環境変数 `STRIPE_PRICE_GRANTS` で代用します）。
 
-## 本番化の手順（残作業）
+## 本番化の手順（2026-11-19 実施済み）
 
 前提：本番サイトが **https** で公開されていること
 （Stripeの本番Webhookは https のURLが必須です）。

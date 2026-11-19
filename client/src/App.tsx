@@ -56,12 +56,11 @@ interface Notice { text: string; tone: 'up' | 'down' | 'info'; seq: number}
 
 const PREMIUM: { id: string; name: string; price: string; url: string; desc: string}[] = [
 { id: 'ad_free', name: '広告無期限廃止', price: '¥280', url: 'https://buy.stripe.com/fZu00jeXN3Z26Nmfv82VG00', desc: '自己蘇生に広告が不要になります'},
-// Stripe links for the three items below are created later; while url is
-// empty the shop shows a "code activation" note instead of a buy button.
-{ id: 'speed_up', name: 'ドロー速度アップ', price: '¥280', url: '', desc: '次のドローまでの間隔が1.75倍速くなります（通常速度にも切り替えできます）'},
-{ id: 'auto_draw', name: 'オートドロー', price: '¥280', url: '', desc: 'ドローが自動で進みます（自己蘇生の選択画面で止まります）'},
-{ id: 'full_auto', name: 'フルオートドロー', price: '¥980', url: '', desc: 'オートドローに加え、自己蘇生の選択も事前に決めて自動で進みます（結果画面で止まります）'},
-{ id: 'duelist_pack', name: 'デュエリストパック', price: '¥1,080', url: '', desc: '広告無期限廃止・ドロー速度アップ・フルオートドローの3点セット（別々に買うと合計1,540円）'},
+// All Stripe links are live; the webhook auto-grants purchases.
+{ id: 'speed_up', name: 'ドロー速度アップ', price: '¥280', url: 'https://buy.stripe.com/6oU7sL9Dt3Z2efO1Ei2VG08', desc: '次のドローまでの間隔が1.75倍速くなります（通常速度にも切り替えできます）'},
+{ id: 'auto_draw', name: 'オートドロー', price: '¥280', url: 'https://buy.stripe.com/fZubJ18zpfHKgnW96K2VG09', desc: 'ドローが自動で進みます（自己蘇生の選択画面で止まります）'},
+{ id: 'full_auto', name: 'フルオートドロー', price: '¥980', url: 'https://buy.stripe.com/aFa8wPdTJ3Z21t2er42VG0a', desc: 'オートドローに加え、自己蘇生の選択も事前に決めて自動で進みます（結果画面で止まります）'},
+{ id: 'duelist_pack', name: 'デュエリストパック', price: '¥1,080', url: 'https://buy.stripe.com/eVqfZhbLB1QU8VuciW2VG0b', desc: '広告無期限廃止・ドロー速度アップ・フルオートドローの3点セット（別々に買うと合計1,540円）'},
 { id: 'souls300', name: '300ソウル', price: '¥120', url: 'https://buy.stripe.com/14A8wPaHxfHK5Ji96K2VG02', desc: ''},
 { id: 'souls1000', name: '1,000ソウル', price: '¥320', url: 'https://buy.stripe.com/9B6dR98zpbrugnW0Ae2VG03', desc: ''},
 { id: 'souls2500', name: '2,500ソウル', price: '¥680', url: 'https://buy.stripe.com/28E00jg1R9jm6Nm4Qu2VG04', desc: ''},
@@ -1013,7 +1012,7 @@ onClick={() => owned
 </div>
 
 <h2 className="sec">課金アイテム</h2>
-<div className="goldbox"><br />ご購入後、解除コードを購入時のメールアドレス宛に yamamoto510yoh@gmail.com からお送りします。届いたコードを下の「コード入力」に入力すると反映されます。</div>
+<div className="goldbox"><br />ご購入いただくと、アイテムはこのゲームに自動で反映されます。反映されない場合は、時間を置いて画面を開き直してください。それでも反映されない場合は yamamoto510yoh@gmail.com までご連絡ください。</div>
 {PREMIUM.map((it) => {
 const owned = (it.id === 'ad_free' && player.adFree)
 || (it.id === 'speed_up' && player.speedUp)
@@ -1034,7 +1033,7 @@ return (
 })}
 
 <h2 className="sec">コード入力</h2>
-<p className="note">コードは購入時のメールアドレス宛に yamamoto510yoh@gmail.com から届きます。</p>
+<p className="note">お持ちの解除コードはこちらから入力できます。</p>
 <div className="codebox">
 <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="DM-XXXX-XXXX" />
 <button className="buybtn" onClick={() => buy(async () => {
