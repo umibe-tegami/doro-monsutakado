@@ -1,10 +1,35 @@
 // Voice / SE / BGM playback. Voice and BGM have independent mute settings.
 let voiceMuted = false;
 let bgmEnabled = true;
-export function setVoiceMuted(m: boolean) { voiceMuted = m; }
+export function setVoiceMuted(m: boolean) {
+  voiceMuted = m;
+  if (m && currentVoice) {
+    currentVoice.pause();
+    currentVoice.currentTime = 0;
+    currentVoice = null;
+  }
+}
 export function setBgmEnabled(m: boolean) { bgmEnabled = m; if (!m) stopBgm(); else playBgm(currentTrack); }
 
+// Callout voices share ONE channel (same as the original game): starting
+// a new callout cuts off the one still playing, so callouts can never
+// overlap each other.
+let currentVoice: HTMLAudioElement | null = null;
 export function playVoice(name: string) {
+  if (voiceMuted) return;
+  try {
+    if (currentVoice) {
+      currentVoice.pause();
+      currentVoice.currentTime = 0;
+    }
+    const a = new Audio(`/media/voice/${name}.mp3`);
+    currentVoice = a;
+    a.play().catch(() => {});
+  } catch { /* ignore */ }
+}
+// Independent channel for the mid-run skit lines: they must not cut off
+// (or be cut off by) the draw callouts.
+export function playVoiceIndependent(name: string) {
   if (voiceMuted) return;
   try {
     const a = new Audio(`/media/voice/${name}.mp3`);

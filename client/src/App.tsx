@@ -34,7 +34,24 @@ try { const s = localStorage.getItem(BKEY); return s? (JSON.parse(s) as Battle):
 }
 
 interface Ann { title: string; sub?: string; tone: Mode | 'fall' | 'info'}
-const MODE_LABEL: Record<Mode, string> = { normal: '通常モード', super: 'スーパーモード', ultra: 'ウルトラモード', ultimate: 'アルティメットモード'};
+// Formal mode names, matched to the original game. The badge uses the
+// original's badge wording; the side rails use its full rail names.
+const MODE_LABEL: Record<Mode, string> = { normal: '通常モード', super: 'スーパーモンスタードローモード', ultra: 'ウルトラモンスターカードドローモード', ultimate: 'アルティメットドローモード'};
+const RAIL_LABEL: Record<Mode, string> = { normal: '', super: 'スーパーモンスタードローモード', ultra: 'ウルトラモンスターカードドローモード', ultimate: 'アルティメットモンスターカードドローモード'};
+
+// Draw pacing, matched to the original game: the draw callout starts on
+// tap and the result resolves 1850ms later, so the monster callout never
+// overlaps the draw callout.
+const DRAW_BEAT_MS = 1850;
+// One-beat pause on a mode fall: the 「通常モードへ」 card is shown for
+// this long before the mode actually drops back to normal.
+const FALL_BEAT_MS = 1400;
+// One-beat pause when a run ends on a miss, before the revive / result
+// flow takes over.
+const END_BEAT_MS = 1500;
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+interface Notice { text: string; tone: 'up' | 'down' | 'info'; seq: number}
 
 const PREMIUM: { id: string; name: string; price: string; url: string; desc: string}[] = [
 { id: 'ad_free', name: '広告無期限廃止', price: '¥280', url: 'https://buy.stripe.com/fZu00jeXN3Z26Nmfv82VG00', desc: '自己蘇生に広告が不要になります'},
@@ -58,6 +75,7 @@ const [player, setPlayer] = useState<PlayerState | null>(null);
 const [view, setView] = useState<View>('title');
 const [battle, setBattle] = useState<Battle | null>(() => loadBattle());
 const [ann, setAnn] = useState<Ann | null>(null);
+const [notice, setNotice] = useState<Notice | null>(null);
 const [skit, setSkit] = useState<number>(-1);
 const [showIntro, setShowIntro] = useState(false);
 const [showRevive, setShowRevive] = useState(false);
@@ -94,15 +112,21 @@ setAnn(a);
 window.setTimeout(() => setAnn((cur) => (cur === a? null: cur)), ms);
 }, []);
 
+// Live commentary banner (same texts / tones as the original game).
+// It stays up until the next draw starts; it is not auto-dismissed.
+const showNotice = useCallback((text: string, tone: Notice['tone']) => {
+setNotice({ text, tone, seq: Date.now()});
+}, []);
+
 const playSkit = useCallback(() => {
 const lines = ['friend_stop', 'self_shake', 'friend_zero'];
 lines.forEach((v, i) => {
-window.setTimeout(() => { setSkit(i); au.playVoice(v);}, i * 1400);
+window.setTimeout(() => { setSkit(i); au.playVoiceIndependent(v);}, i * 1400);
 });
 window.setTimeout(() => setSkit(-1), lines.length * 1400 + 400);
 }, []);
 
-const drawCards = useCallback(async (n: number, B: Battle) => {
+const drawCards = useCallback(async (n: number, B: Battle, beat: () => Promise<void>) => {
 const ids: number[] = [];
 const news: boolean[] = [];
 for (let i = 0; i < n; i++) {
@@ -111,6 +135,8 @@ const r = await api.recordDraw(sid);
 ids.push(sid); news.push(r.isNew);
 }
 if (n > 0) await api.awardSouls(n);
+// Wait out the draw callout before the result (and its callout) lands.
+await beat();
 B.streak += ids.length;
 B.damage += 1500 * ids.length;
 B.lastCards = ids;
@@ -125,7 +151,11 @@ const doDraw = useCallback(async () => {
 const B0 = battleRef.current;
 if (!B0 ||!B0.active || busy) return;
 setBusy(true);
+setNotice(null);
 au.playVoice('draw');
+const startedAt = Date.now();
+// The result of a draw resolves on this beat (see DRAW_BEAT_MS).
+const beat = async () => { const w = DRAW_BEAT_MS - (Date.now() - startedAt); if (w > 0) await sleep(w);};
 const B: Battle = {...B0};
 const prevStreak = B.streak;
 let ended = false;
@@ -133,79 +163,96 @@ try {
 if (B.mode === 'normal') {
 const r = Math.random();
 if (r < 0.10) {
+await beat();
 B.mode = 'super'; B.superLeft = 3; B.ultraReserved = false;
 au.playSe('garo_navi'); au.vibrate(220);
-announce({ title: 'スーパーモード突入！！', sub: '3回連続ドロー確定！', tone: 'super'});
+announce({ title: 'スーパーモンスタードローモード突入！！', sub: 'ここから3回、確定でモンスターが引ける！', tone: 'super'});
 } else if (r < 0.30) {
 ended = true;
 } else {
-await drawCards(1, B);
+await drawCards(1, B, beat);
 }
 } else if (B.mode === 'super') {
-await drawCards(1, B);
+await drawCards(1, B, beat);
 if (Math.random() < 0.234) B.ultraReserved = true;
 B.superLeft -= 1;
 if (B.superLeft <= 0) {
 if (B.ultraReserved) {
 B.mode = 'ultra'; B.guarantee = 3;
 au.playSe('garo_navi'); au.vibrate(260);
-announce({ title: 'ウルトラモード昇格！！', sub: '一気に3枚ドローのチャンス！', tone: 'ultra'});
+announce({ title: 'ウルトラモンスターカードドローモード昇格！！', sub: '一気に3枚ドローのチャンス！', tone: 'ultra'});
+showNotice('ウルトラモンスターカードドローモード昇格！！', 'up');
 } else {
 B.mode = 'normal';
 announce({ title: '通常モードへ', sub: '連チャンは継続中！', tone: 'info'});
+showNotice('スーパーモンスタードロー終了 ― 通常モードへ', 'down');
 }
 }
 } else if (B.mode === 'ultra') {
 const guaranteed = B.guarantee > 0;
 if (B.guarantee > 0) B.guarantee -= 1;
 const r = Math.random();
-if (r < 0.40) await drawCards(1, B);
-else if (r < 0.75) await drawCards(3, B);
+if (r < 0.40) await drawCards(1, B, beat);
+else if (r < 0.75) { await drawCards(3, B, beat); showNotice('一気に3枚ドロー！！', 'up');}
 else if (r < 0.85) {
+await beat();
 B.mode = 'ultimate'; B.guarantee = 5;
 au.playSe('garo_shutsugen'); au.vibrate(400);
-announce({ title: 'アルティメットモード昇格！！', sub: '一気に5枚ドローの嵐！', tone: 'ultimate'});
+announce({ title: 'アルティメットドローモード昇格！！', sub: '最上位モード突入！', tone: 'ultimate'});
 } else if (guaranteed) {
-await drawCards(1, B);
+await drawCards(1, B, beat);
 } else {
+// Fall to normal: hold one beat on the announcement card (draw
+// button stays disabled via `busy`) before the mode actually drops.
+await beat();
+announce({ title: '通常モードへ', sub: '転落…でも連チャンは継続中！', tone: 'fall'}, FALL_BEAT_MS);
+await sleep(FALL_BEAT_MS);
 B.mode = 'normal';
-announce({ title: '通常モードへ', sub: '転落…でも連チャンは継続中！', tone: 'fall'});
 }
 } else { // ultimate
 const guaranteed = B.guarantee > 0;
 if (B.guarantee > 0) B.guarantee -= 1;
 const r = Math.random();
-if (r < 0.30) await drawCards(1, B);
-else if (r < 0.90) await drawCards(5, B);
-else if (guaranteed) await drawCards(1, B);
+if (r < 0.30) await drawCards(1, B, beat);
+else if (r < 0.90) { await drawCards(5, B, beat); showNotice('一気に5枚ドロー！！', 'up');}
+else if (guaranteed) await drawCards(1, B, beat);
 else {
+await beat();
+announce({ title: '通常モードへ', sub: '転落…でも連チャンは継続中！', tone: 'fall'}, FALL_BEAT_MS);
+await sleep(FALL_BEAT_MS);
 B.mode = 'normal';
-announce({ title: '通常モードへ', sub: '転落…でも連チャンは継続中！', tone: 'fall'});
 }
 }
 } catch (e) { /* network hiccup: keep state */}
 setBattle(B);
 battleRef.current = B;
 await refresh().catch(() => {});
-setBusy(false);
 if (ended) {
+// Run ends on a miss: hold one beat on the 「残念！！」 card before
+// the revive offer / result flow appears.
+await beat();
 au.playVoice('miss');
+announce({ title: '残念！！', sub: `${B.streak}連チャンで終了`, tone: 'fall'}, END_BEAT_MS);
+await sleep(END_BEAT_MS);
+setBusy(false);
 if (B.revivesUsed < 2) setShowRevive(true);
 else finishRun();
 return;
 }
+setBusy(false);
 if (!B.skitPlayed && Math.floor(B.streak / 5) > Math.floor(prevStreak / 5) && B.streak > 0) {
 const B2: Battle = {...B, skitPlayed: true};
 setBattle(B2);
 battleRef.current = B2;
 window.setTimeout(playSkit, 500);
 }
-}, [busy, drawCards, announce, refresh, playSkit, finishRun]);
+}, [busy, drawCards, announce, refresh, playSkit, finishRun, showNotice]);
 
 const startRun = useCallback(() => {
 if (battleRef.current?.active) { setView('battle'); return;}
 const B = freshBattle();
 setBattle(B); battleRef.current = B;
+setNotice(null);
 setView('battle');
 setShowIntro(true);
 au.playVoice('intro');
@@ -224,14 +271,17 @@ setBattle(B); battleRef.current = B;
 setShowRevive(false); setShowAd(false);
 await refresh().catch(() => {});
 if (B.mode === 'ultra') { au.playSe('garo_navi'); au.vibrate(260);}
-announce({ title: '自己蘇生！！', sub: B.mode === 'ultra'? 'ウルトラモードから再開！': '通常モードから再開！', tone: B.mode === 'ultra'? 'ultra': 'info'});
-}, [refresh, announce]);
+announce({ title: '自己蘇生！！', sub: B.mode === 'ultra'? 'ウルトラモンスターカードドローモードから再開！': '通常モードから再開！', tone: B.mode === 'ultra'? 'ultra': 'info'});
+if (B.mode === 'ultra') showNotice('自己蘇生！ ウルトラモンスターカードドローモードから再開！！', 'up');
+else showNotice('自己蘇生！ 通常モードから再開', 'info');
+}, [refresh, announce, showNotice]);
 
 const submitAndClose = useCallback(async (name: string) => {
 const B = battleRef.current;
 if (B) { try { await api.submitScore(name, B.streak);} catch { /* ignore */}}
 localStorage.setItem('doro-name', name);
 setShowResult(false);
+setNotice(null);
 setBattle(null); battleRef.current = null;
 localStorage.removeItem(BKEY);
 await refresh().catch(() => {});
@@ -267,7 +317,7 @@ return (
 <div className="view">
 <div className="title-wrap">
 <div className="game-logo">ドロー<br />モンスター<br />カード</div>
-<p className="note" style={{ textAlign: 'center'}}>引くたびモンスター、1枚1500ダメージ。<br />外れるまで終われない、バーサーカータマシイ。</p>
+<p className="note" style={{ textAlign: 'center'}}>引くたびモンスター、1枚1500ダメージ。<br />外れるまで終われない速攻魔法。</p>
 <button className="bigbtn" onClick={startRun}>{battle?.active? '対戦を再開する': 'デュエル開始！'}</button>
 <button className="subbtn" onClick={() => setView('dex')}>図鑑を見る</button>
 <button className="subbtn" onClick={() => setView('shop')}>ショップ</button>
@@ -278,18 +328,17 @@ return (
 )}
 
 {view === 'battle' && battle && (
-<div className="view" style={{ paddingLeft: battle.mode!== 'normal'? 30: 12, paddingRight: battle.mode!== 'normal'? 30: 12}}>
+<div className="view" style={{ paddingLeft: battle.mode!== 'normal'? 40: 12, paddingRight: battle.mode!== 'normal'? 40: 12}}>
 <div className="battle-bg" style={selBg? { backgroundImage: `url(/media/bg/${selBg.id}.jpg)`}: { backgroundImage: 'url(/media/arena.webp)', opacity: 1}} />
 {battle.mode!== 'normal' && (<>
-<div className={`rail left ${battle.mode}`}>{MODE_LABEL[battle.mode]}</div>
-<div className={`rail right ${battle.mode}`}>{MODE_LABEL[battle.mode]}</div>
+<div className="rail left"><div className={`rail-track up ${battle.mode === 'ultimate'? 'slow': ''}`}>{[0, 1].map((h) => (<div key={h} className="rail-half" aria-hidden>{[0, 1, 2].map((i) => (<span key={i} className={`rail-glyph ${battle.mode}`}>{RAIL_LABEL[battle.mode]}</span>))}</div>))}</div></div>
+<div className="rail right"><div className={`rail-track down ${battle.mode === 'ultimate'? 'slow': ''}`}>{[0, 1].map((h) => (<div key={h} className="rail-half" aria-hidden>{[0, 1, 2].map((i) => (<span key={i} className={`rail-glyph ${battle.mode}`}>{RAIL_LABEL[battle.mode]}</span>))}</div>))}</div></div>
 </>)}
 <div className="battle-inner">
 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap'}}>
 <button className="iconbtn" onClick={() => setView('title')}>タイトルへ</button>
-<span className={`modechip ${battle.mode}`}>{MODE_LABEL[battle.mode]}</span>
-{battle.mode === 'super' && <span className="note">残り{battle.superLeft}回確定ドロー</span>}
-{(battle.mode === 'ultra' || battle.mode === 'ultimate') && battle.guarantee > 0 && <span className="note">転落保証 残り{battle.guarantee}回</span>}
+<span className={`modechip ${battle.mode}`}>{battle.mode === 'super'? `スーパーモンスタードロー（あと${battle.superLeft}回）`: MODE_LABEL[battle.mode]}</span>
+{(battle.mode === 'super') && <span className="note">残り{battle.superLeft}回確定ドロー</span>}
 <span style={{ marginLeft: 'auto'}} />
 <label className="iconbtn" style={{ cursor: 'pointer'}}>
 画像変更
@@ -305,18 +354,31 @@ const st = await api.customArt(url); setPlayer(st);
 <div className={`life ${life <= 0? 'dead': ''}`}>相手 LIFE <b>{life.toLocaleString()}</b></div>
 <div className="streak">{battle.streak} 連</div>
 </div>
+{battle.mode === 'super' && (
+<p className="modehint super">{battle.ultraReserved? `ウルトラ昇格確定！ あと ${battle.superLeft} 回引ききるとウルトラへ移行`: `確定ドロー残り ${battle.superLeft} 回 ― この間にウルトラ昇格のチャンス`}</p>
+)}
+{battle.mode === 'ultra' && (
+<p className="modehint ultra">3枚ドローとアルティメット昇格を狙え ― 残念でも通常に戻るだけ</p>
+)}
+{battle.mode === 'ultimate' && (
+<p className="modehint ultimate">最上位モード ― 5枚ドローの大盤振る舞い。残念で通常へ</p>
+)}
+{notice && <p key={notice.seq} className={`notice ${notice.tone}`}>{notice.text}</p>}
 <div className="field">
 {battle.lastCards.length === 0 && (
+player.customArt? (
+<div className="deckcard" style={{ width: 128, height: 180}}><img src={player.customArt} alt="デッキ" style={{ width: '100%', height: '100%', objectFit: 'cover'}} /></div>
+): (
 <div className="deckcard" style={{ width: 128, height: 180}}><CardBack art={selBack.art} gid={`field-${selBack.id}`} /></div>
+)
 )}
 {battle.lastCards.map((sid, i) => {
 const sp = SPECIES_MAP.get(sid)!;
 const rar = RARITY_MAP.get(sp.rarity)!;
-const useCustom = i === 0 &&!!player.customArt;
 return (
 <div key={`${sid}-${i}`} className="moncard new" style={{ borderColor: rar.frame, boxShadow: `0 0 14px ${rar.glow}`}}>
 <div className="art">
-{useCustom? <img src={player.customArt!} alt="カスタム" style={{ width: '100%', height: '100%', objectFit: 'cover'}} />: <MonsterArt species={sp} />}
+<MonsterArt species={sp} />
 </div>
 <div className="nm">{sp.name}{battle.lastNew[i]? ' ✨NEW': ''}</div>
 <div className="atk">攻 {sp.atk} / 守 {sp.def}</div>
@@ -325,10 +387,14 @@ return (
 })}
 </div>
 <div className="deckrow">
+{player.customArt? (
+<div className="deckcard"><img src={player.customArt} alt="デッキ" style={{ width: '100%', height: '100%', objectFit: 'cover'}} /></div>
+): (
 <div className="deckcard"><CardBack art={selBack.art} gid={`deck-${selBack.id}`} /></div>
+)}
 <button className="drawbtn" disabled={busy || showIntro || showRevive || showResult} onClick={doDraw}>ドロー！！</button>
 </div>
-<p className="note" style={{ textAlign: 'center'}}>総ダメージ {battle.damage.toLocaleString()} ／ 自己蘇生 残り{2 - battle.revivesUsed}回</p>
+<p className="dmgline">総ダメージ {battle.damage.toLocaleString()} ／ 自己蘇生 残り{2 - battle.revivesUsed}回</p>
 </div>
 </div>
 )}
@@ -356,7 +422,7 @@ return (
 {showIntro && (
 <div className="overlay">
 <div className="announce">
-<h3 style={{ fontSize: 20}}>速攻魔法発動！！<br />バーサーカータマシイ！！</h3>
+<h3 style={{ fontSize: 20}}>速攻魔法発動！！</h3>
 <p>ドローする度にモンスターなら相手に1500ダメージ。外れるまでドローし続けられる。モンスターを引くほど連チャンとソウルが増えていく、捨て身の速攻魔法。</p>
 <button className="bigbtn" onClick={() => setShowIntro(false)}>ドローを開始する</button>
 </div>
@@ -366,8 +432,12 @@ return (
 <div className="overlay">
 <div className="modal">
 <h3>残念…！ でも、まだ終われない</h3>
-<p className="note">自己蘇生 {battle.revivesUsed + 1} 回目（最大2回）。連チャンとダメージは継続します。
-{battle.revivesUsed === 0? '通常モードから再開します。': 'ウルトラモード（転落保証3回）から再開します。'}</p>
+<p className="note">自己蘇生 {battle.revivesUsed + 1} 回目（最大2回）。連チャンとダメージは継続します。</p>
+{battle.revivesUsed === 0? (
+<p className="revive-mode normal">通常モードから再開！</p>
+): (
+<p className="revive-mode ultra">ウルトラモンスターカードドローモードから再開！</p>
+)}
 {battle.revivesUsed === 0 &&!player.adFree && (
 <button className="bigbtn" disabled={player.souls < 100} onClick={() => doRevive('souls')}>100ソウルで自己蘇生（残り {player.souls}）</button>
 )}
@@ -464,20 +534,18 @@ return (
 </div>
 <div className="flowarrow">▼ スーパー突入 10%</div>
 <div className="flowbox" style={{ borderColor: '#9aa3ad'}}>
-<b style={{ color: '#e8ecf4'}}>スーパーモード</b><br />
+<b style={{ color: '#e8ecf4'}}>スーパーモンスタードロー</b><br />
 3回確定ドロー。各回23.4%でウルトラ昇格を予約（3回引ききってから移行）。消化後は通常へ（連チャン継続）
 </div>
 <div className="flowarrow">▼ ウルトラ昇格（予約成立時）</div>
 <div className="flowbox" style={{ borderColor: '#f0b429'}}>
-<b style={{ color: '#ffd94d'}}>ウルトラモード</b><br />
-モンスター 40% ／ 一気に3枚 35% ／ アルティメット昇格 10% ／ 通常へ転落 15%<br />
-※突入直後3回分は転落しません
+<b style={{ color: '#ffd94d'}}>ウルトラモンスターカードドロー</b><br />
+モンスター 40% ／ 一気に3枚 35% ／ アルティメット昇格 10% ／ 通常へ転落 15%
 </div>
 <div className="flowarrow">▼ アルティメット昇格 10%</div>
 <div className="flowbox" style={{ borderColor: '#ff5fa2', background: 'linear-gradient(180deg,#2c1440,#10142c)'}}>
-<b style={{ background: 'linear-gradient(90deg,#ff5f6d,#ffb340,#ffe94d,#7ee081,#4db2ff,#b04fd8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent'}}>アルティメットモード</b><br />
-モンスター 30% ／ 一気に5枚 60% ／ 通常へ転落 10%<br />
-※突入直後5回分は転落しません
+<b style={{ background: 'linear-gradient(90deg,#ff5f6d,#ffb340,#ffe94d,#7ee081,#4db2ff,#b04fd8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent'}}>アルティメットドローモード</b><br />
+モンスター 30% ／ 一気に5枚 60% ／ 通常へ転落 10%
 </div>
 <p className="note">モンスター1枚＝1500ダメージ。ドローで連チャンが増える度にソウル+1。残念で終了した時は自己蘇生（最大2回）が使えます。</p>
 </div>

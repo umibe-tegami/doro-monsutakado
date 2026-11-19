@@ -30,16 +30,48 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 /* battle */
 .battle-bg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: .5; z-index: 0; }
 .battle-inner { position: relative; z-index: 1; }
-.rail { position: absolute; top: 0; bottom: 0; width: 26px; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; font-weight: 900; letter-spacing: 4px; font-size: 14px; z-index: 2; pointer-events: none; }
-.rail.left { left: 0; } .rail.right { right: 0; transform: rotate(180deg); }
-.rail.super { color: #e8ecf4; text-shadow: 0 0 8px #9aa3ad; background: linear-gradient(180deg, transparent, rgba(154,163,173,.25), transparent); }
-.rail.ultra { color: #ffd94d; text-shadow: 0 0 10px #f0b429; background: linear-gradient(180deg, transparent, rgba(240,180,41,.25), transparent); }
-.rail.ultimate { background: linear-gradient(180deg,#ff5f6d,#ffb340,#ffe94d,#7ee081,#4db2ff,#b04fd8); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
+/* Mode side rails (original game's style): the mode name flows
+   vertically down both screen edges in a seamless loop — silver for
+   Super, gold for Ultra, rainbow for Ultimate. The track holds two
+   identical halves, so translating by -50% loops without a seam; the
+   right rail runs the other way. Glyphs are plain vertical-rl text on
+   both sides (never mirrored). */
+.rail { position: absolute; top: 0; bottom: 0; width: 36px; overflow: hidden; z-index: 2; pointer-events: none; }
+.rail.left { left: 0; background: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.30), transparent); }
+.rail.right { right: 0; background: linear-gradient(-90deg, rgba(0,0,0,.55), rgba(0,0,0,.30), transparent); }
+.rail-track { display: flex; flex-direction: column; align-items: center; will-change: transform; }
+.rail-track.up { animation: rail-scroll-up 26s linear infinite; }
+.rail-track.down { animation: rail-scroll-down 26s linear infinite; }
+.rail-track.slow { animation-duration: 34s; }
+@keyframes rail-scroll-up { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+@keyframes rail-scroll-down { from { transform: translateY(-50%); } to { transform: translateY(0); } }
+.rail-half { display: flex; flex-direction: column; align-items: center; }
+.rail-glyph { writing-mode: vertical-rl; font-size: 20px; font-weight: 800; line-height: 1; letter-spacing: .22em; padding: 1.1em 0; }
+.rail-glyph.super { background-image: linear-gradient(180deg, #ffffff 0%, #d7dce3 30%, #868d98 52%, #eef1f5 74%, #646a73 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rail-glyph.ultra { background-image: linear-gradient(180deg, #fff6c4 0%, #ffd94d 32%, #b8860b 55%, #ffe97a 78%, #8a6a00 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rail-glyph.ultimate { background-image: linear-gradient(180deg, #ff5f57 0%, #ffb340 18%, #ffe94d 36%, #5fd35f 54%, #4db2ff 72%, #9d6bff 88%, #ff5fa2 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .life-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
 .life { flex: 1; background: #171d3d; border: 1px solid #33407a; border-radius: 10px; padding: 7px 10px; font-size: 13px; }
 .life b { font-size: 17px; color: #ff8a7a; }
 .life.dead b { color: #ff5f6d; }
 .streak { background: #171d3d; border: 1px solid #f0b429; color: #ffd94d; border-radius: 10px; padding: 7px 12px; font-weight: 900; font-size: 16px; white-space: nowrap; }
+/* Mode hint + live commentary banner (ported from the original game). */
+.modehint { margin: 6px 0 0; text-align: center; font-size: 12px; font-weight: 700; }
+.modehint.super { color: #ffd94d; }
+.modehint.ultra { color: #ff9d97; }
+.modehint.ultimate { color: #2ec4b6; }
+.notice { margin: 8px auto 0; width: 100%; max-width: 448px; border-radius: 8px; padding: 8px 16px; text-align: center; font-size: 16px; font-weight: 800; letter-spacing: 2px; animation: fade-up .5s ease-out both; }
+.notice.up { background: #2ec4b6; color: #06251f; }
+.notice.down { background: #23233c; color: #a49fc0; }
+.notice.info { background: #d4a017; color: #241a00; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+/* Total-damage line: dark translucent panel + white text so it stays
+   readable over the bright arena background. */
+.dmgline { margin: 8px 0 0; text-align: center; font-size: 12.5px; font-weight: 700; line-height: 1.6; color: #ffffff; background: rgba(23,29,61,.88); border: 1px solid #33407a; border-radius: 10px; padding: 7px 10px; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+/* Revive dialog: the restart mode is pitched as a headline banner. */
+.revive-mode { margin: 10px 0; text-align: center; font-size: 19px; font-weight: 900; line-height: 1.5; border-radius: 12px; padding: 10px 12px; border: 2px solid; }
+.revive-mode.normal { background: #1d3a52; color: #bfe0ff; border-color: #3e7cb1; }
+.revive-mode.ultra { background: #5c430a; color: #ffd94d; border-color: #f0b429; box-shadow: 0 0 18px rgba(240,180,41,.45); }
 .field { display: flex; gap: 8px; justify-content: center; align-items: stretch; min-height: 196px; margin: 10px 0; flex-wrap: wrap; }
 .moncard { width: 128px; border-radius: 12px; padding: 6px; background: #141a36; border: 3px solid #666; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
 .moncard .art { height: 104px; border-radius: 8px; overflow: hidden; background: #0a0d20; }
