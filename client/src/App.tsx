@@ -475,10 +475,19 @@ return (
 
 {view === 'title' && (
 <div className="view">
+<div className="title-bg" />
 <div className="title-wrap">
-<div className="game-logo">ドロー<br />モンスター<br />カード</div>
-<p className="note" style={{ textAlign: 'center'}}>引くたびモンスター、1枚1500ダメージ。<br />外れるまで終われない速攻魔法。</p>
-<button className="bigbtn" onClick={startRun}>{battle?.active? '対戦を再開する': 'デュエル開始！'}</button>
+<div className="title-hero">
+<div className="title-texts">
+<div className="title-label">新作ブラウザゲーム</div>
+<div className="title-doromon">ドロモン</div>
+<div className="title-full">ドローモンスターカード</div>
+<p className="title-copy">引くたびモンスター、<br />1枚1500ダメージ。</p>
+</div>
+<img className="title-dragon" src="/media/ultimate.webp" alt="虹霓の創世龍レインボー＝オリジン" />
+</div>
+<p className="title-tag">外れるまで終われない速攻魔法。</p>
+<button className="bigbtn pill" onClick={startRun}>{battle?.active? '対戦を再開する': 'デュエル開始！'}</button>
 <button className="subbtn" onClick={() => setView('dex')}>図鑑を見る</button>
 <button className="subbtn" onClick={() => setView('shop')}>ショップ</button>
 <button className="subbtn" onClick={() => setView('ranking')}>ランキング</button>

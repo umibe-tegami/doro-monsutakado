@@ -20,7 +20,18 @@ h2.sec { font-size: 17px; margin: 14px 0 8px; }
 p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 
 /* title */
-.title-wrap { text-align: center; padding: 34px 10px; }
+ .title-wrap { text-align: center; padding: 34px 10px; }
+.title-bg { position: absolute; inset: 0; background-image: linear-gradient(rgba(5,7,18,.55), rgba(5,7,18,.78)), url(/media/arena.webp); background-size: cover; background-position: center; }
+.title-wrap { position: relative; z-index: 1; }
+.title-hero { display: flex; gap: 12px; align-items: flex-start; text-align: left; }
+.title-texts { flex: 1; min-width: 0; padding-top: 6px; }
+.title-label { color: #aab4d8; font-weight: 700; font-size: 15px; letter-spacing: 1px; }
+.title-doromon { font-size: clamp(46px, 14.5vw, 84px); font-weight: 900; line-height: 1.08; letter-spacing: 1px; background: linear-gradient(90deg,#ff5f6d,#ffb340,#ffe94d,#7ee081,#4db2ff,#b04fd8,#ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 10px rgba(240,180,41,.35)); }
+.title-full { font-size: 19px; font-weight: 800; color: #fff; margin-top: 4px; }
+.title-copy { color: #ffe94d; font-weight: 800; font-size: 17px; line-height: 1.55; margin: 12px 0 0; }
+.title-dragon { width: 31%; max-width: 168px; height: 236px; object-fit: cover; border: 3px solid #ffd94d; border-radius: 16px; flex-shrink: 0; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+.title-tag { text-align: center; color: #e6ebff; font-size: 14.5px; margin: 16px 0 4px; }
+.bigbtn.pill { border-radius: 999px; }
 .game-logo { font-size: 34px; font-weight: 900; line-height: 1.25; letter-spacing: 1px; background: linear-gradient(90deg,#ff5f6d,#ffb340,#ffe94d,#7ee081,#4db2ff,#b04fd8,#ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 10px rgba(240,180,41,.35)); }
 .bigbtn { display: block; width: 100%; padding: 15px; font-size: 18px; font-weight: 900; border: none; border-radius: 14px; background: linear-gradient(180deg,#ffd94d,#f0a429); color: #2a1c00; box-shadow: 0 4px 18px rgba(240,180,41,.35); margin: 10px 0; }
 .bigbtn:active { transform: scale(.98); }
