@@ -50,6 +50,7 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 .rail-glyph.super { background-image: linear-gradient(180deg, #ffffff 0%, #d7dce3 30%, #868d98 52%, #eef1f5 74%, #646a73 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .rail-glyph.ultra { background-image: linear-gradient(180deg, #fff6c4 0%, #ffd94d 32%, #b8860b 55%, #ffe97a 78%, #8a6a00 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .rail-glyph.ultimate { background-image: linear-gradient(180deg, #ff5f57 0%, #ffb340 18%, #ffe94d 36%, #5fd35f 54%, #4db2ff 72%, #9d6bff 88%, #ff5fa2 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rail-glyph.heavens { background-image: linear-gradient(180deg, #ffffff 0%, #fdf6da 30%, #d9be6a 52%, #fffbe9 74%, #b89b3e 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .life-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
 .life { flex: 1; background: #171d3d; border: 1px solid #33407a; border-radius: 10px; padding: 7px 10px; font-size: 13px; }
 .life b { font-size: 17px; color: #ff8a7a; }
@@ -60,6 +61,7 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 .modehint.super { color: #ffd94d; }
 .modehint.ultra { color: #ff9d97; }
 .modehint.ultimate { color: #2ec4b6; }
+.modehint.heavens { color: #ffeeb0; text-shadow: 0 0 10px rgba(255,238,176,.55); }
 .notice { margin: 8px auto 0; width: 100%; max-width: 448px; border-radius: 8px; padding: 8px 16px; text-align: center; font-size: 16px; font-weight: 800; letter-spacing: 2px; animation: fade-up .5s ease-out both; }
 .notice.up { background: #2ec4b6; color: #06251f; }
 .notice.down { background: #23233c; color: #a49fc0; }
@@ -94,6 +96,7 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 .modechip.super { background: #3a4149; color: #fff; border-color: #9aa3ad; }
 .modechip.ultra { background: #5c430a; color: #ffd94d; border-color: #f0b429; }
 .modechip.ultimate { background: linear-gradient(90deg,#57183f,#4a2358,#1d3a52); color: #fff; border-color: #ff5fa2; }
+.modechip.heavens { background: linear-gradient(90deg,#ffffff,#f7ecc8); color: #5c4a08; border-color: #e8d48a; box-shadow: 0 0 12px rgba(255,244,200,.55); }
 
 /* overlays */
 .overlay { position: fixed; inset: 0; background: rgba(4,6,16,.78); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
@@ -110,6 +113,24 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 .announce.ultra h3 { background-image: linear-gradient(90deg,#fff6c4 0%,#ffe94d 30%,#f0b429 52%,#ffedb3 74%,#b97e10 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .announce.ultimate { border: 3px solid transparent; background: linear-gradient(180deg,#232c5e,#121a3d) padding-box, linear-gradient(135deg,#ff5f57,#ffb340,#ffe94d,#5fd35f,#4db2ff,#9d6bff,#ff5fa2) border-box; box-shadow: 0 0 34px rgba(157,107,255,.5); }
 .announce.ultimate h3 { background-image: linear-gradient(90deg,#ff5f57,#ffb340,#ffe94d,#5fd35f,#4db2ff,#9d6bff,#ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.announce.heavens { border-color: #f0deb0; background: linear-gradient(180deg,#4a4f78,#232847); box-shadow: 0 0 44px rgba(255,244,200,.7); }
+.announce.heavens h3 { background-image: linear-gradient(90deg,#ffffff,#fdf3d0,#e9cf8a,#ffffff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* Heavens entry: the whole screen flashes white. */
+.heavens-flash { position: fixed; inset: 0; background: #fffdf4; z-index: 200; pointer-events: none; animation: heavens-flash 1.05s ease-out forwards; }
+@keyframes heavens-flash { 0% { opacity: 0; } 18% { opacity: .95; } 100% { opacity: 0; } }
+/* Heavens 100-card performance: the drawn cards stream right-to-left
+   across the field for about 3 seconds (the animation duration is
+   cosmetic; the lock is held by the draw logic). */
+.heavens-flow { position: relative; width: 100%; height: 150px; overflow: hidden; border-radius: 12px; background: radial-gradient(ellipse at center, rgba(255,248,214,.16), rgba(10,13,32,.25) 70%); }
+.heavens-flow-track { position: absolute; left: 0; top: 50%; margin-top: -57px; display: flex; gap: 6px; will-change: transform; animation: heavens-flow-scroll 3s linear forwards; }
+@keyframes heavens-flow-scroll { from { transform: translateX(0); } to { transform: translateX(-94%); } }
+.flowcard { width: 76px; flex: 0 0 auto; border-radius: 8px; padding: 3px; background: #141a36; border: 2.5px solid #666; box-shadow: 0 4px 12px rgba(0,0,0,.5); }
+.flowcard .art { height: 104px; border-radius: 6px; overflow: hidden; background: #0a0d20; }
+.pickups { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.pickup { font-size: 12px; font-weight: 700; background: #1a2142; border: 1.5px solid #666; border-radius: 999px; padding: 3px 9px; }
+.pickup.more { color: #ffd94d; border-color: #f0b429; }
+/* Tester panel (only for players with the tester flag). */
+.testpanel { margin: 8px 0 0; background: rgba(46,32,8,.88); border: 1px dashed #f0b429; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 7px; }
 .announce p { margin: 4px 0; font-size: 14px; line-height: 1.7; color: #dfe6ff; }
 .modal { width: min(520px, 94vw); max-height: 88dvh; overflow-y: auto; border-radius: 16px; background: #151b38; border: 1px solid #3a4a8f; padding: 16px; }
 .modal h3 { margin-top: 0; }

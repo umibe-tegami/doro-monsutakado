@@ -96,6 +96,7 @@ async function playerState(id) {
     speedUp: !!Number(p.speed_up),
     autoDraw: !!Number(p.auto_draw),
     fullAuto: !!Number(p.full_auto),
+    tester: !!Number(p.tester),
     speedFast: !!Number(p.speed_fast),
     playMode: ['auto', 'fullauto'].includes(p.play_mode) ? p.play_mode : 'manual',
     faRevive1: ['souls', 'ad', 'end'].includes(p.fa_revive1) ? p.fa_revive1 : 'ad',
@@ -130,6 +131,17 @@ app.post('/api/record-draw', async (req, res) => {
   if (!SPECIES.has(speciesId)) return res.status(400).json({ error: 'unknown species' });
   const r = await addToCollection(id, speciesId);
   res.json(r);
+});
+
+// Batch variant of /api/record-draw (the heavens 100-card draw records a
+// whole performance at once instead of firing 100 single requests).
+app.post('/api/record-draws', async (req, res) => {
+  const id = needPlayer(req, res); if (!id) return;
+  const ids = Array.isArray(req.body.speciesIds) ? req.body.speciesIds.map(Number) : [];
+  if (ids.length === 0 || ids.length > 200 || ids.some((s) => !SPECIES.has(s))) return res.status(400).json({ error: 'invalid speciesIds' });
+  const out = [];
+  for (const sid of ids) out.push(await addToCollection(id, sid));
+  res.json(out);
 });
 
 app.post('/api/award-souls', async (req, res) => {
@@ -275,6 +287,14 @@ app.post('/api/redeem-code', async (req, res) => {
   const code = String(req.body.code || '').trim().toUpperCase();
   const row = await db.one('SELECT * FROM redemption_codes WHERE code = $1', [code]);
   if (!row) return res.status(400).json({ error: 'コードが見つかりません' });
+  if (row.item_id === 'tester') {
+    // Tester codes are never consumed: any player can use one, any number
+    // of times. Redeeming only raises the tester flag on that player.
+    await getPlayer(id);
+    await db.run('UPDATE players SET tester = 1 WHERE id = $1', [id]);
+    const st = await playerState(id);
+    return res.json({ item: 'tester', message: 'テスターパネルが有効になりました', souls: st.souls, adFree: st.adFree, speedUp: st.speedUp, autoDraw: st.autoDraw, fullAuto: st.fullAuto, tester: st.tester });
+  }
   if (row.used_by) return res.status(400).json({ error: 'このコードは既に使用されています' });
   const p = await getPlayer(id);
   const item = row.item_id;

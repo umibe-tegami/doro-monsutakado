@@ -44,9 +44,18 @@ export function playSe(name: string) {
 }
 export function vibrate(ms = 200) { try { navigator.vibrate && navigator.vibrate(ms); } catch { /* ignore */ } }
 
+// Cut whatever callout is currently playing (used when the heavens
+// 100-card performance starts: no callouts during the card stream).
+export function stopVoice() {
+  if (currentVoice) {
+    try { currentVoice.pause(); currentVoice.currentTime = 0; } catch { /* ignore */ }
+    currentVoice = null;
+  }
+}
+
 let bgmEl: HTMLAudioElement | null = null;
-let currentTrack: 'normal' | 'ultimate' = 'normal';
-export function playBgm(track: 'normal' | 'ultimate') {
+let currentTrack: 'normal' | 'ultimate' | 'heavens' = 'normal';
+export function playBgm(track: 'normal' | 'ultimate' | 'heavens') {
   currentTrack = track;
   if (!bgmEnabled) return;
   try {

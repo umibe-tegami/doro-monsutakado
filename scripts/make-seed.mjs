@@ -20,6 +20,7 @@ const MAP = {
   'auto_draw.txt': 'auto_draw',
   'full_auto.txt': 'full_auto',
   'duelist_pack.txt': 'duelist_pack',
+  'tester.txt': 'tester',
 };
 const out = {};
 for (const [file, item] of Object.entries(MAP)) {

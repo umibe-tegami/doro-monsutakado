@@ -8,7 +8,7 @@ import MonsterArt from './MonsterArt';
 import CardBack from './CardBack';
 import * as au from './audio';
 
-type Mode = 'normal' | 'super' | 'ultra' | 'ultimate';
+type Mode = 'normal' | 'super' | 'ultra' | 'ultimate' | 'heavens';
 type View = 'title' | 'battle' | 'dex' | 'shop' | 'ranking';
 
 interface Battle {
@@ -33,11 +33,12 @@ function loadBattle(): Battle | null {
 try { const s = localStorage.getItem(BKEY); return s? (JSON.parse(s) as Battle): null;} catch { return null;}
 }
 
-interface Ann { title: string; sub?: string; tone: Mode | 'fall' | 'info'}
-// Formal mode names, matched to the original game. The badge uses the
-// original's badge wording; the side rails use its full rail names.
-const MODE_LABEL: Record<Mode, string> = { normal: '通常モード', super: 'スーパーモンスタードローモード', ultra: 'ウルトラモンスターカードドローモード', ultimate: 'アルティメットドローモード'};
-const RAIL_LABEL: Record<Mode, string> = { normal: '', super: 'スーパーモンスタードローモード', ultra: 'ウルトラモンスターカードドローモード', ultimate: 'アルティメットモンスターカードドローモード'};
+interface Ann { title: string; sub?: string; tone: Mode | 'fall' | 'info' | 'end'}
+// Mode names are unified to the 「〇〇ドローモード」 form everywhere
+// (badge, side rails, announcements, flow chart). The badge uses the
+// same wording; super adds its remaining-draws count on top.
+const MODE_LABEL: Record<Mode, string> = { normal: '通常モード', super: 'スーパードローモード', ultra: 'ウルトラドローモード', ultimate: 'アルティメットドローモード', heavens: 'ヘブンスドローモード'};
+const RAIL_LABEL: Record<Mode, string> = { normal: '', super: 'スーパードローモード', ultra: 'ウルトラドローモード', ultimate: 'アルティメットドローモード', heavens: 'ヘブンスドローモード'};
 
 // Draw pacing, matched to the original game: the draw callout starts on
 // tap and the result resolves 1850ms later, so the monster callout never
@@ -88,6 +89,9 @@ const [showRevive, setShowRevive] = useState(false);
 const [showAd, setShowAd] = useState(false);
 const [showResult, setShowResult] = useState(false);
 const [showFlow, setShowFlow] = useState(false);
+const [heavensFlash, setHeavensFlash] = useState(false);
+const [heavensFlow, setHeavensFlow] = useState<number[] | null>(null);
+const [heavensSummary, setHeavensSummary] = useState<{ newCount: number; pickups: { id: number; isNew: boolean}[]} | null>(null);
 const [busy, setBusy] = useState(false);
 const battleRef = useRef<Battle | null>(battle);
 battleRef.current = battle;
@@ -110,9 +114,11 @@ useEffect(() => {
 if (battle) localStorage.setItem(BKEY, JSON.stringify(battle));
 }, [battle]);
 
-// BGM: battle uses the ultimate track only in ultimate mode.
+// BGM: heavens has its own track, ultimate keeps its track, every
+// other mode shares the normal track (super/ultra switch too often
+// for a music change to feel good).
 useEffect(() => {
-if (view === 'battle' && player?.bgmEnabled) au.playBgm(battle?.mode === 'ultimate'? 'ultimate': 'normal');
+if (view === 'battle' && player?.bgmEnabled) au.playBgm(battle?.mode === 'heavens'? 'heavens': battle?.mode === 'ultimate'? 'ultimate': 'normal');
 if (!player?.bgmEnabled) au.stopBgm();
 }, [view, battle?.mode, player?.bgmEnabled]);
 
@@ -154,6 +160,49 @@ if (ids.length) au.playVoice('monster');
 return ids;
 }, []);
 
+// Heavens entry (shared by the ultimate promotion and the 1/8192
+// miracle gate): white flash over the whole screen, the P.F.O.G.
+// appearance sound, a long announcement in heavens colors. Entering
+// discards any super draws / ultra reservation still pending.
+const enterHeavens = useCallback((B: Battle, viaPromotion: boolean) => {
+B.mode = 'heavens'; B.guarantee = 3; B.superLeft = 0; B.ultraReserved = false;
+setHeavensFlash(true);
+window.setTimeout(() => setHeavensFlash(false), 1100);
+au.playSe('garo_shutsugen'); au.vibrate(500);
+announce({ title: viaPromotion? 'ヘブンスドローモード昇格！！': 'ヘブンスドローモード突入！！', sub: '天上モード ― 100枚ドローの奇跡を掴め！', tone: 'heavens'}, 2800);
+}, [announce]);
+
+// The heavens 100-card draw: 100 species are rolled and recorded in
+// chunks while the drawn cards stream right-to-left across the field
+// for about 3 seconds (controls stay locked via `busy`; no callouts
+// during the stream). Afterwards a result summary opens. Streak /
+// damage / souls are applied to B and the summary state.
+const runHeavens100 = useCallback(async (B: Battle) => {
+au.stopVoice();
+showNotice('一気に100枚ドロー！！', 'up');
+const ids: number[] = [];
+for (let i = 0; i < 100; i++) ids.push(drawSpeciesId());
+const results: { isNew: boolean}[] = new Array(100).fill(null).map(() => ({ isNew: false}));
+setHeavensFlow(ids);
+const jobs: Promise<void>[] = [];
+for (let i = 0; i < ids.length; i += 20) {
+const slice = ids.slice(i, i + 20);
+const at = i;
+jobs.push(api.recordDraws(slice).then((rs) => { rs.forEach((r, j) => { results[at + j] = { isNew: !!r.isNew};});}).catch(() => {}));
+}
+await Promise.all([...jobs, api.awardSouls(100).catch(() => {}), sleep(3000)]);
+setHeavensFlow(null);
+B.streak += 100;
+B.damage += 1500 * 100;
+const pickups = ids.map((id, i) => ({ id, isNew: results[i].isNew}))
+.filter((c) => ['SR', 'U', 'L', 'GL', 'UL'].includes(SPECIES_MAP.get(c.id)!.rarity));
+const rank = (id: number) => ['N', 'R', 'SR', 'U', 'L', 'GL', 'UL'].indexOf(SPECIES_MAP.get(id)!.rarity);
+const field = [...pickups].sort((a, b) => rank(b.id) - rank(a.id)).slice(0, 5);
+B.lastCards = field.map((c) => c.id);
+B.lastNew = field.map((c) => c.isNew);
+setHeavensSummary({ newCount: results.filter((r) => r.isNew).length, pickups});
+}, [showNotice]);
+
 const finishRun = useCallback(() => { setShowResult(true);}, []);
 
 const doDraw = useCallback(async () => {
@@ -172,13 +221,20 @@ const B: Battle = {...B0};
 const prevStreak = B.streak;
 let ended = false;
 try {
-if (B.mode === 'normal') {
+// Miracle gate: every draw outside heavens first rolls 1/8192 for a
+// direct heavens entry. A hit replaces the draw's normal result —
+// the same handling as a super entry from normal mode (no card is
+// drawn on the entry draw, pending super state is discarded).
+if (B.mode!== 'heavens' && Math.random() * 8192 < 1) {
+await beat();
+enterHeavens(B, false);
+} else if (B.mode === 'normal') {
 const r = Math.random();
 if (r < 0.10) {
 await beat();
 B.mode = 'super'; B.superLeft = 3; B.ultraReserved = false;
 au.playSe('garo_navi'); au.vibrate(220);
-announce({ title: 'スーパーモンスタードローモード突入！！', sub: 'ここから3回、確定でモンスターが引ける！', tone: 'super'});
+announce({ title: 'スーパードローモード突入！！', sub: 'ここから3回、確定でモンスターが引ける！', tone: 'super'});
 } else if (r < 0.30) {
 ended = true;
 } else {
@@ -192,12 +248,12 @@ if (B.superLeft <= 0) {
 if (B.ultraReserved) {
 B.mode = 'ultra'; B.guarantee = 3;
 au.playSe('garo_navi'); au.vibrate(260);
-announce({ title: 'ウルトラモンスターカードドローモード昇格！！', sub: '一気に3枚ドローのチャンス！', tone: 'ultra'});
-showNotice('ウルトラモンスターカードドローモード昇格！！', 'up');
+announce({ title: 'ウルトラドローモード昇格！！', sub: '一気に3枚ドローのチャンス！', tone: 'ultra'});
+showNotice('ウルトラドローモード昇格！！', 'up');
 } else {
 B.mode = 'normal';
 announce({ title: '通常モードへ', sub: '連チャンは継続中！', tone: 'info'});
-showNotice('スーパーモンスタードロー終了 ― 通常モードへ', 'down');
+showNotice('スーパードローモード終了 ― 通常モードへ', 'down');
 }
 }
 } else if (B.mode === 'ultra') {
@@ -210,7 +266,7 @@ else if (r < 0.85) {
 await beat();
 B.mode = 'ultimate'; B.guarantee = 5;
 au.playSe('garo_shutsugen'); au.vibrate(400);
-announce({ title: 'アルティメットドローモード昇格！！', sub: '最上位モード突入！', tone: 'ultimate'});
+announce({ title: 'アルティメットドローモード昇格！！', sub: '一気に5枚ドローのチャンス！', tone: 'ultimate'});
 } else if (guaranteed) {
 await drawCards(1, B, beat);
 } else {
@@ -221,18 +277,41 @@ announce({ title: '通常モードへ', sub: '転落…でも連チャンは継�
 await sleep(FALL_BEAT_MS);
 B.mode = 'normal';
 }
-} else { // ultimate
+} else if (B.mode === 'ultimate') {
+// Ultimate table: monster 29.5% / 5-card draw 60% / heavens
+// promotion 0.5% / fall to normal 10% (sums to 100%). The fall
+// guarantee converts a fall result into a single monster draw.
 const guaranteed = B.guarantee > 0;
 if (B.guarantee > 0) B.guarantee -= 1;
 const r = Math.random();
-if (r < 0.30) await drawCards(1, B, beat);
-else if (r < 0.90) { await drawCards(5, B, beat); showNotice('アルティメットドローで5枚引け！！', 'up');}
+if (r < 0.295) await drawCards(1, B, beat);
+else if (r < 0.895) { await drawCards(5, B, beat); showNotice('アルティメットドローで5枚引け！！', 'up');}
+else if (r < 0.90) {
+await beat();
+enterHeavens(B, true);
+}
 else if (guaranteed) await drawCards(1, B, beat);
 else {
 await beat();
 announce({ title: '通常モードへ', sub: '転落…でも連チャンは継続中！', tone: 'fall'}, FALL_BEAT_MS);
 await sleep(FALL_BEAT_MS);
 B.mode = 'normal';
+}
+} else { // heavens
+// Heavens table: 100-card draw 50% / demote to ultimate 50%. The
+// 3-draw fall guarantee converts a demotion into another 100-card
+// draw, so the first three draws after entry always pay out.
+const guaranteed = B.guarantee > 0;
+if (B.guarantee > 0) B.guarantee -= 1;
+const r = Math.random();
+if (r < 0.50 || guaranteed) {
+await beat();
+await runHeavens100(B);
+} else {
+await beat();
+announce({ title: 'アルティメットドローモードへ', sub: '降格…でも連チャンは継続中！', tone: 'fall'}, FALL_BEAT_MS);
+await sleep(FALL_BEAT_MS);
+B.mode = 'ultimate'; B.guarantee = 5;
 }
 }
 } catch (e) { /* network hiccup: keep state */}
@@ -275,7 +354,7 @@ setBattle(B2);
 battleRef.current = B2;
 window.setTimeout(playSkit, 500);
 }
-}, [busy, drawCards, announce, refresh, playSkit, finishRun, showNotice]);
+}, [busy, drawCards, announce, refresh, playSkit, finishRun, showNotice, enterHeavens, runHeavens100]);
 
 const startRun = useCallback(() => {
 if (battleRef.current?.active) { setView('battle'); return;}
@@ -300,8 +379,8 @@ setBattle(B); battleRef.current = B;
 setShowRevive(false); setShowAd(false);
 await refresh().catch(() => {});
 if (B.mode === 'ultra') { au.playSe('garo_navi'); au.vibrate(260);}
-announce({ title: '自己蘇生！！', sub: B.mode === 'ultra'? 'ウルトラモンスターカードドローモードから再開！': '通常モードから再開！', tone: B.mode === 'ultra'? 'ultra': 'info'});
-if (B.mode === 'ultra') showNotice('自己蘇生！ ウルトラモンスターカードドローモードから再開！！', 'up');
+announce({ title: '自己蘇生！！', sub: B.mode === 'ultra'? 'ウルトラドローモードから再開！': '通常モードから再開！', tone: B.mode === 'ultra'? 'ultra': 'info'});
+if (B.mode === 'ultra') showNotice('自己蘇生！ ウルトラドローモードから再開！！', 'up');
 else showNotice('自己蘇生！ 通常モードから再開', 'info');
 }, [refresh, announce, showNotice]);
 doReviveRef.current = doRevive;
@@ -314,9 +393,37 @@ const autoActive = !!player && player.playMode!== 'manual' && (player.autoDraw |
 useEffect(() => {
 if (!autoActive || view!== 'battle' ||!battle?.active || busy) return;
 if (showIntro || showRevive || showAd || showResult || showFlow) return;
+// The heavens card stream locks controls while it runs, and auto
+// waits while the 100-card result summary is on screen.
+if (heavensFlow || heavensSummary) return;
 const t = window.setTimeout(() => { doDraw();}, 450);
 return () => window.clearTimeout(t);
-}, [autoActive, view, battle, busy, showIntro, showRevive, showAd, showResult, showFlow, doDraw]);
+}, [autoActive, view, battle, busy, showIntro, showRevive, showAd, showResult, showFlow, heavensFlow, heavensSummary, doDraw]);
+
+// Tester panel actions (only rendered for players with the tester
+// flag): jump straight into any mode, or fire the heavens 100-card
+// performance on demand. Numbers produced this way are recorded
+// exactly like normal play.
+const forceMode = (m: Mode) => {
+const B0 = battleRef.current;
+if (!B0) return;
+const B: Battle = {...B0, mode: m};
+if (m === 'super') { B.superLeft = 3; B.ultraReserved = false;}
+if (m === 'ultra') B.guarantee = 3;
+if (m === 'ultimate') B.guarantee = 5;
+if (m === 'heavens') B.guarantee = 3;
+setBattle(B); battleRef.current = B;
+};
+const forceHeavens100 = async () => {
+const B0 = battleRef.current;
+if (!B0 ||!B0.active || busy) return;
+setBusy(true);
+const B: Battle = {...B0};
+try { await runHeavens100(B);} catch { /* keep state */}
+setBattle(B); battleRef.current = B;
+await refresh().catch(() => {});
+setBusy(false);
+};
 
 const submitAndClose = useCallback(async (name: string) => {
 const B = battleRef.current;
@@ -373,13 +480,13 @@ return (
 <div className="view" style={{ paddingLeft: battle.mode!== 'normal'? 40: 12, paddingRight: battle.mode!== 'normal'? 40: 12}}>
 <div className="battle-bg" style={selBg? { backgroundImage: `url(/media/bg/${selBg.id}.jpg)`}: { backgroundImage: 'url(/media/arena.webp)', opacity: 1}} />
 {battle.mode!== 'normal' && (<>
-<div className="rail left"><div className={`rail-track up ${battle.mode === 'ultimate'? 'slow': ''}`}>{[0, 1].map((h) => (<div key={h} className="rail-half" aria-hidden>{[0, 1, 2].map((i) => (<span key={i} className={`rail-glyph ${battle.mode}`}>{RAIL_LABEL[battle.mode]}</span>))}</div>))}</div></div>
-<div className="rail right"><div className={`rail-track down ${battle.mode === 'ultimate'? 'slow': ''}`}>{[0, 1].map((h) => (<div key={h} className="rail-half" aria-hidden>{[0, 1, 2].map((i) => (<span key={i} className={`rail-glyph ${battle.mode}`}>{RAIL_LABEL[battle.mode]}</span>))}</div>))}</div></div>
+<div className="rail left"><div className={`rail-track up ${battle.mode === 'ultimate' || battle.mode === 'heavens'? 'slow': ''}`}>{[0, 1].map((h) => (<div key={h} className="rail-half" aria-hidden>{[0, 1, 2].map((i) => (<span key={i} className={`rail-glyph ${battle.mode}`}>{RAIL_LABEL[battle.mode]}</span>))}</div>))}</div></div>
+<div className="rail right"><div className={`rail-track down ${battle.mode === 'ultimate' || battle.mode === 'heavens'? 'slow': ''}`}>{[0, 1].map((h) => (<div key={h} className="rail-half" aria-hidden>{[0, 1, 2].map((i) => (<span key={i} className={`rail-glyph ${battle.mode}`}>{RAIL_LABEL[battle.mode]}</span>))}</div>))}</div></div>
 </>)}
 <div className="battle-inner">
 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap'}}>
 <button className="iconbtn" onClick={() => setView('title')}>タイトルへ</button>
-<span className={`modechip ${battle.mode}`}>{battle.mode === 'super'? `スーパーモンスタードロー（あと${battle.superLeft}回）`: MODE_LABEL[battle.mode]}</span>
+<span className={`modechip ${battle.mode}`}>{battle.mode === 'super'? `スーパードローモード（あと${battle.superLeft}回）`: MODE_LABEL[battle.mode]}</span>
 {(battle.mode === 'super') && <span className="note">残り{battle.superLeft}回確定ドロー</span>}
 <span style={{ marginLeft: 'auto'}} />
 <label className="iconbtn" style={{ cursor: 'pointer'}}>
@@ -403,10 +510,28 @@ const st = await api.customArt(url); setPlayer(st);
 <p className="modehint ultra">3枚ドローとアルティメット昇格を狙え ― 残念でも通常に戻るだけ</p>
 )}
 {battle.mode === 'ultimate' && (
-<p className="modehint ultimate">最上位モード ― 5枚ドローの大盤振る舞い。残念で通常へ</p>
+<p className="modehint ultimate">5枚ドローの大盤振る舞い ― さらに上、ヘブンス昇格の奇跡も</p>
+)}
+{battle.mode === 'heavens' && (
+<p className="modehint heavens">天上モード ― 50%で100枚ドロー！ 降格してもアルティメットへ</p>
 )}
 {notice && <p key={notice.seq} className={`notice ${notice.tone}`}>{notice.text}</p>}
 <div className="field">
+{heavensFlow? (
+<div className="heavens-flow">
+<div className="heavens-flow-track">
+{heavensFlow.map((sid, i) => {
+const sp = SPECIES_MAP.get(sid)!;
+const rar = RARITY_MAP.get(sp.rarity)!;
+return (
+<div key={i} className="flowcard" style={{ borderColor: rar.frame, boxShadow: `0 0 10px ${rar.glow}`}}>
+<div className="art"><MonsterArt species={sp} /></div>
+</div>
+);
+})}
+</div>
+</div>
+): (<>
 {battle.lastCards.length === 0 && (
 player.customArt? (
 <div className="deckcard" style={{ width: 128, height: 180}}><img src={player.customArt} alt="デッキ" style={{ width: '100%', height: '100%', objectFit: 'cover'}} /></div>
@@ -427,6 +552,7 @@ return (
 </div>
 );
 })}
+</>)}
 </div>
 <div className="deckrow">
 {player.customArt? (
@@ -434,7 +560,7 @@ return (
 ): (
 <div className="deckcard"><CardBack art={selBack.art} gid={`deck-${selBack.id}`} /></div>
 )}
-<button className="drawbtn" disabled={busy || showIntro || showRevive || showResult} onClick={doDraw}>ドロー！！</button>
+<button className="drawbtn" disabled={busy || showIntro || showRevive || showResult || !!heavensFlow || !!heavensSummary} onClick={doDraw}>ドロー！！</button>
 </div>
 <p className="dmgline">総ダメージ {battle.damage.toLocaleString()} ／ 自己蘇生 残り{2 - battle.revivesUsed}回</p>
 {(player.speedUp || player.autoDraw || player.fullAuto) && (
@@ -479,6 +605,25 @@ return (
 )}
 </div>
 )}
+{player.tester && (
+<div className="testpanel">
+<div className="pp-row">
+<span className="pp-label">テスト：モード</span>
+<div className="seg">
+{(['normal', 'super', 'ultra', 'ultimate', 'heavens'] as Mode[]).map((m) => (
+<button key={m} className={battle.mode === m? 'on': ''} onClick={() => forceMode(m)}>{MODE_LABEL[m]}</button>
+))}
+</div>
+</div>
+<div className="pp-row">
+<span className="pp-label">テスト：演出</span>
+<div className="seg">
+<button disabled={busy || !!heavensFlow} onClick={forceHeavens100}>100枚ドロー強制</button>
+</div>
+<span className="note">転落保証 残り{battle.guarantee}回</span>
+</div>
+</div>
+)}
 </div>
 </div>
 )}
@@ -492,6 +637,30 @@ return (
 <div className={`announce ${ann.tone}`}>
 <h3>{ann.title}</h3>
 {ann.sub && <p>{ann.sub}</p>}
+</div>
+</div>
+)}
+{heavensFlash && <div className="heavens-flash" />}
+{heavensSummary && (
+<div className="overlay">
+<div className="modal heavens-summary">
+<h3>100枚ドロー結果</h3>
+<p>合計ダメージ：<b>150,000</b></p>
+<p>獲得ソウル：<b>+100</b> ／ 新規カード：<b>{heavensSummary.newCount}枚</b></p>
+{heavensSummary.pickups.length > 0 && (
+<>
+<p className="note" style={{ marginBottom: 4}}>SR以上のピックアップ</p>
+<div className="pickups">
+{heavensSummary.pickups.slice(0, 15).map((c, i) => {
+const sp = SPECIES_MAP.get(c.id)!;
+const rar = RARITY_MAP.get(sp.rarity)!;
+return <span key={i} className="pickup" style={{ borderColor: rar.frame}}>{sp.name}{c.isNew? ' ✨NEW': ''}</span>;
+})}
+{heavensSummary.pickups.length > 15 && <span className="pickup more">他{heavensSummary.pickups.length - 15}枚</span>}
+</div>
+</>
+)}
+<button className="bigbtn" onClick={() => setHeavensSummary(null)}>閉じる</button>
 </div>
 </div>
 )}
@@ -519,7 +688,7 @@ return (
 <p className="note">自己蘇生 {battle.revivesUsed + 1} 回目（最大2回）。連チャンとダメージは継続します。{battle.revivesUsed === 0? (
 <span className="revive-em normal">通常モードから再開！</span>
 ): (
-<span className="revive-em ultra">ウルトラモンスターカードドローモードから再開！</span>
+<span className="revive-em ultra">ウルトラドローモードから再開！</span>
 )}</p>
 {battle.revivesUsed === 0 &&!player.adFree && (
 <button className="bigbtn" disabled={player.souls < 100} onClick={() => doRevive('souls')}>100ソウルで自己蘇生（残り {player.souls}）</button>
@@ -619,24 +788,29 @@ return (
 <div className="flow">
 <div className="flowbox" style={{ borderColor: '#3e7cb1'}}>
 <b style={{ color: '#7db8ec'}}>通常モード</b><br />
-モンスター 70% ／ スーパーモード突入 10% ／ 残念（終了）20%
+モンスター 70% ／ スーパードローモード突入 10% ／ 残念（終了）20%
 </div>
 <div className="flowarrow">▼ スーパー突入 10%</div>
 <div className="flowbox" style={{ borderColor: '#9aa3ad'}}>
-<b style={{ color: '#e8ecf4'}}>スーパーモンスタードロー</b><br />
+<b style={{ color: '#e8ecf4'}}>スーパードローモード</b><br />
 3回確定ドロー。各回23.4%でウルトラ昇格を予約（3回引ききってから移行）。消化後は通常へ（連チャン継続）
 </div>
 <div className="flowarrow">▼ ウルトラ昇格（予約成立時）</div>
 <div className="flowbox" style={{ borderColor: '#f0b429'}}>
-<b style={{ color: '#ffd94d'}}>ウルトラモンスターカードドロー</b><br />
+<b style={{ color: '#ffd94d'}}>ウルトラドローモード</b><br />
 モンスター 40% ／ 一気に3枚 35% ／ アルティメット昇格 10% ／ 通常へ転落 15%
 </div>
 <div className="flowarrow">▼ アルティメット昇格 10%</div>
 <div className="flowbox" style={{ borderColor: '#ff5fa2', background: 'linear-gradient(180deg,#2c1440,#10142c)'}}>
 <b style={{ background: 'linear-gradient(90deg,#ff5f6d,#ffb340,#ffe94d,#7ee081,#4db2ff,#b04fd8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent'}}>アルティメットドローモード</b><br />
-モンスター 30% ／ 一気に5枚 60% ／ 通常へ転落 10%
+モンスター 29.5% ／ 一気に5枚 60% ／ ヘブンス昇格 0.5% ／ 通常へ転落 10%
 </div>
-<p className="note">モンスター1枚＝1500ダメージ。ドローで連チャンが増える度にソウル+1。残念で終了した時は自己蘇生（最大2回）が使えます。</p>
+<div className="flowarrow">▼ ヘブンス昇格 0.5%</div>
+<div className="flowbox" style={{ borderColor: '#e8d48a', background: 'linear-gradient(180deg,#3a3f63,#171c38)'}}>
+<b style={{ background: 'linear-gradient(90deg,#ffffff,#fdf3d0,#e9cf8a,#ffffff)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent'}}>ヘブンスドローモード</b><br />
+100枚ドロー 50% ／ アルティメットへ降格 50%
+</div>
+<p className="note">モンスター1枚＝1500ダメージ。ドローで連チャンが増える度にソウル+1。残念で終了した時は自己蘇生（最大2回）が使えます。全モードのドローには、1/8192でヘブンスへ直接突入する奇跡抽選があります。</p>
 </div>
 );
 }

@@ -11,7 +11,7 @@ export function playerId(): string {
 export interface CollectionEntry { count: number; firstGotAt: number | null }
 export interface PlayerState {
   playerId: string; name: string; souls: number; lifetimeSouls: number;
-  adFree: boolean; speedUp: boolean; autoDraw: boolean; fullAuto: boolean;
+  adFree: boolean; speedUp: boolean; autoDraw: boolean; fullAuto: boolean; tester: boolean;
   speedFast: boolean; playMode: 'manual' | 'auto' | 'fullauto';
   faRevive1: 'souls' | 'ad' | 'end'; faRevive2: 'ad' | 'end';
   bgmEnabled: boolean; voiceMuted: boolean;
@@ -35,6 +35,7 @@ async function post<T>(path: string, body: Record<string, unknown> = {}): Promis
 export const api = {
   state: () => post<PlayerState>('/api/state'),
   recordDraw: (speciesId: number) => post<{ count: number; isNew: boolean; ownedSpecies: number; compElapsedMs: number | null }>('/api/record-draw', { speciesId }),
+  recordDraws: (speciesIds: number[]) => post<{ count: number; isNew: boolean }[]>('/api/record-draws', { speciesIds }),
   awardSouls: (amount: number) => post<{ souls: number; lifetimeSouls: number }>('/api/award-souls', { amount }),
   payRevive: () => post<{ souls: number }>('/api/pay-revive'),
   sellCard: (speciesId: number) => post<{ souls: number; count: number; gained: number }>('/api/sell-card', { speciesId }),
