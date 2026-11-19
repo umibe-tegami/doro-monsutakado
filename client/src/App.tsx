@@ -1012,7 +1012,7 @@ onClick={() => owned
 </div>
 
 <h2 className="sec">課金アイテム</h2>
-<div className="goldbox"><br />ご購入いただくと、アイテムはこのゲームに自動で反映されます。反映されない場合は、時間を置いて画面を開き直してください。それでも反映されない場合は yamamoto510yoh@gmail.com までご連絡ください。</div>
+<div className="goldbox"><br />ご購入いただくと、アイテムはこのゲームに自動で反映されます。反映されない場合は、時間を置いて画面を開き直してください。</div>
 {PREMIUM.map((it) => {
 const owned = (it.id === 'ad_free' && player.adFree)
 || (it.id === 'speed_up' && player.speedUp)
