@@ -213,7 +213,7 @@ const PACKS = {
   normal: { price: 100, count: 3 },
   rare: { price: 300, count: 10 },
   unowned: { price: 1000, count: 1 },
-  ultimate: { price: 5000, count: 1 },
+  ultimate: { price: 10000, count: 1 },
 };
 app.post('/api/buy-pack', async (req, res) => {
   const id = needPlayer(req, res); if (!id) return;
