@@ -107,6 +107,7 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 .announce.super h3 { background-image: linear-gradient(90deg,#ffffff 0%,#d7dce3 30%,#868d98 52%,#eef1f5 74%,#646a73 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .announce.info, .announce.fall { border-color: #3e7cb1; box-shadow: 0 0 34px rgba(77,178,255,.45); }
 .announce.info h3, .announce.fall h3 { color: #7ec3ff; }
+.announce.ultra h3 { background-image: linear-gradient(90deg,#fff6c4 0%,#ffe94d 30%,#f0b429 52%,#ffedb3 74%,#b97e10 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .announce.ultimate { border: 3px solid transparent; background: linear-gradient(180deg,#232c5e,#121a3d) padding-box, linear-gradient(135deg,#ff5f57,#ffb340,#ffe94d,#5fd35f,#4db2ff,#9d6bff,#ff5fa2) border-box; box-shadow: 0 0 34px rgba(157,107,255,.5); }
 .announce.ultimate h3 { background-image: linear-gradient(90deg,#ff5f57,#ffb340,#ffe94d,#5fd35f,#4db2ff,#9d6bff,#ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .announce p { margin: 4px 0; font-size: 14px; line-height: 1.7; color: #dfe6ff; }

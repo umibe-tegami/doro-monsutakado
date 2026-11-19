@@ -57,7 +57,7 @@ const PREMIUM: { id: string; name: string; price: string; url: string; desc: str
 { id: 'ad_free', name: '広告無期限廃止', price: '¥280', url: 'https://buy.stripe.com/fZu00jeXN3Z26Nmfv82VG00', desc: '自己蘇生に広告が不要になります'},
 // Stripe links for the three items below are created later; while url is
 // empty the shop shows a "code activation" note instead of a buy button.
-{ id: 'speed_up', name: 'ドロー速度アップ', price: '¥280', url: '', desc: '次のドローまでの間隔が1.5倍速くなります（通常速度にも切り替えできます）'},
+{ id: 'speed_up', name: 'ドロー速度アップ', price: '¥280', url: '', desc: '次のドローまでの間隔が1.75倍速くなります（通常速度にも切り替えできます）'},
 { id: 'auto_draw', name: 'オートドロー', price: '¥280', url: '', desc: 'ドローが自動で進みます（自己蘇生の選択画面で止まります）'},
 { id: 'full_auto', name: 'フルオートドロー', price: '¥980', url: '', desc: 'オートドローに加え、自己蘇生の選択も事前に決めて自動で進みます（結果画面で止まります）'},
 { id: 'duelist_pack', name: 'デュエリストパック', price: '¥1,080', url: '', desc: '広告無期限廃止・ドロー速度アップ・フルオートドローの3点セット（別々に買うと合計1,540円）'},
@@ -164,9 +164,9 @@ setNotice(null);
 au.playVoice('draw');
 const startedAt = Date.now();
 // The result of a draw resolves on this beat (see DRAW_BEAT_MS). With
-// the speed-up item owned and set to fast, the beat shrinks to 1/1.5.
+// the speed-up item owned and set to fast, the beat shrinks to 1/1.75.
 const pl0 = playerRef.current;
-const beatMs = pl0?.speedUp && pl0?.speedFast ? Math.round(DRAW_BEAT_MS / 1.5) : DRAW_BEAT_MS;
+const beatMs = pl0?.speedUp && pl0?.speedFast ? Math.round(DRAW_BEAT_MS / 1.75) : DRAW_BEAT_MS;
 const beat = async () => { const w = beatMs - (Date.now() - startedAt); if (w > 0) await sleep(w);};
 const B: Battle = {...B0};
 const prevStreak = B.streak;
@@ -444,7 +444,7 @@ return (
 <span className="pp-label">ドロー速度</span>
 <div className="seg">
 <button className={!player.speedFast? 'on': ''} onClick={async () => setPlayer(await api.settings({ speedFast: false}))}>通常</button>
-<button className={player.speedFast? 'on': ''} onClick={async () => setPlayer(await api.settings({ speedFast: true}))}>速い（1.5倍）</button>
+<button className={player.speedFast? 'on': ''} onClick={async () => setPlayer(await api.settings({ speedFast: true}))}>速い（1.75倍）</button>
 </div>
 </div>
 )}
