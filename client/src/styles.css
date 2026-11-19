@@ -29,7 +29,7 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 
 /* battle */
 .battle-bg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: .5; z-index: 0; }
-.battle-inner { position: relative; z-index: 1; }
+.battle-inner { position: relative; z-index: 1; padding-bottom: 136px; }
 /* Mode side rails (original game's style): the mode name flows
    vertically down both screen edges in a seamless loop — silver for
    Super, gold for Ultra, rainbow for Ultimate. The track holds two
@@ -92,6 +92,17 @@ p.note { font-size: 12.5px; color: #aab4d8; line-height: 1.6; }
 .deckcard { width: 74px; height: 104px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.55); }
 .drawbtn { font-size: 19px; font-weight: 900; padding: 14px 30px; border-radius: 999px; border: none; background: linear-gradient(180deg,#ff7a5c,#e0483e); color: #fff; box-shadow: 0 5px 18px rgba(224,72,62,.5); }
 .drawbtn:disabled { opacity: .5; }
+/* Fixed bottom bar (battle view only): the draw button floats at the
+   bottom centre of the screen so it stays reachable no matter how tall
+   the draw result grows — no scrolling down to press it. The button
+   sits above the total-damage band inside the same bar, so the two
+   never overlap. z-index stays below every overlay (100) and the
+   heavens flash (200), so dialogs and announcements cover it.
+   Battle content gets matching bottom padding (see .battle-inner) so
+   its tail is never hidden behind the bar. */
+.battlebar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: min(560px, 100%); z-index: 30; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 12px calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(11,14,26,0), rgba(11,14,26,.88) 38%, rgba(11,14,26,.97)); pointer-events: none; }
+.battlebar .drawbtn { pointer-events: auto; }
+.battlebar .dmgline { margin: 0; width: 100%; }
 .modechip { display: inline-block; padding: 3px 12px; border-radius: 999px; font-weight: 900; font-size: 13px; background: #1d3a52; color: #bfe0ff; border: 1px solid #3e7cb1; }
 .modechip.super { background: #3a4149; color: #fff; border-color: #9aa3ad; }
 .modechip.ultra { background: #5c430a; color: #ffd94d; border-color: #f0b429; }

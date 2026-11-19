@@ -560,9 +560,7 @@ return (
 ): (
 <div className="deckcard"><CardBack art={selBack.art} gid={`deck-${selBack.id}`} /></div>
 )}
-<button className="drawbtn" disabled={busy || showIntro || showRevive || showResult || !!heavensFlow || !!heavensSummary} onClick={doDraw}>ドロー！！</button>
 </div>
-<p className="dmgline">総ダメージ {battle.damage.toLocaleString()} ／ 自己蘇生 残り{2 - battle.revivesUsed}回</p>
 {(player.speedUp || player.autoDraw || player.fullAuto) && (
 <div className="playpanel">
 {player.speedUp && (
@@ -624,6 +622,10 @@ return (
 </div>
 </div>
 )}
+</div>
+<div className="battlebar">
+<button className="drawbtn" disabled={busy || showIntro || showRevive || showResult || !!heavensFlow || !!heavensSummary} onClick={doDraw}>ドロー！！</button>
+<p className="dmgline">総ダメージ {battle.damage.toLocaleString()} ／ 自己蘇生 残り{2 - battle.revivesUsed}回</p>
 </div>
 </div>
 )}
