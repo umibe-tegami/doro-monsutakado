@@ -11,7 +11,10 @@ export function playerId(): string {
 export interface CollectionEntry { count: number; firstGotAt: number | null }
 export interface PlayerState {
   playerId: string; name: string; souls: number; lifetimeSouls: number;
-  adFree: boolean; bgmEnabled: boolean; voiceMuted: boolean;
+  adFree: boolean; speedUp: boolean; autoDraw: boolean; fullAuto: boolean;
+  speedFast: boolean; playMode: 'manual' | 'auto' | 'fullauto';
+  faRevive1: 'souls' | 'ad' | 'end'; faRevive2: 'ad' | 'end';
+  bgmEnabled: boolean; voiceMuted: boolean;
   selectedBg: string; selectedBack: string; customArt: string | null;
   createdAt: number; compElapsedMs: number | null;
   collection: Record<number, CollectionEntry>;
@@ -43,7 +46,7 @@ export const api = {
   redeemCode: (code: string) => post<{ item: string; message: string; souls: number }>('/api/redeem-code', { code }),
   submitScore: (name: string, streak: number) => post<{ ok: boolean }>('/api/submit-score', { name, streak }),
   rankings: () => post<Rankings>('/api/rankings'),
-  settings: (s: { bgmEnabled?: boolean; voiceMuted?: boolean }) => post<PlayerState>('/api/settings', s),
+  settings: (s: { bgmEnabled?: boolean; voiceMuted?: boolean; speedFast?: boolean; playMode?: string; faRevive1?: string; faRevive2?: string }) => post<PlayerState>('/api/settings', s),
   customArt: (dataUrl: string | null) => post<PlayerState>('/api/custom-art', { dataUrl }),
 };
 

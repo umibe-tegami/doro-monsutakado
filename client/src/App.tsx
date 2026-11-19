@@ -55,6 +55,12 @@ interface Notice { text: string; tone: 'up' | 'down' | 'info'; seq: number}
 
 const PREMIUM: { id: string; name: string; price: string; url: string; desc: string}[] = [
 { id: 'ad_free', name: '広告無期限廃止', price: '¥280', url: 'https://buy.stripe.com/fZu00jeXN3Z26Nmfv82VG00', desc: '自己蘇生に広告が不要になります'},
+// Stripe links for the three items below are created later; while url is
+// empty the shop shows a "code activation" note instead of a buy button.
+{ id: 'speed_up', name: 'ドロー速度アップ', price: '¥280', url: '', desc: '次のドローまでの間隔が1.5倍速くなります（通常速度にも切り替えできます）'},
+{ id: 'auto_draw', name: 'オートドロー', price: '¥280', url: '', desc: 'ドローが自動で進みます（自己蘇生の選択画面で止まります）'},
+{ id: 'full_auto', name: 'フルオートドロー', price: '¥980', url: '', desc: 'オートドローに加え、自己蘇生の選択も事前に決めて自動で進みます（結果画面で止まります）'},
+{ id: 'duelist_pack', name: 'デュエリストパック', price: '¥1,080', url: '', desc: '広告無期限廃止・ドロー速度アップ・フルオートドローの3点セット（別々に買うと合計1,540円）'},
 { id: 'souls300', name: '300ソウル', price: '¥120', url: 'https://buy.stripe.com/14A8wPaHxfHK5Ji96K2VG02', desc: ''},
 { id: 'souls1000', name: '1,000ソウル', price: '¥320', url: 'https://buy.stripe.com/9B6dR98zpbrugnW0Ae2VG03', desc: ''},
 { id: 'souls2500', name: '2,500ソウル', price: '¥680', url: 'https://buy.stripe.com/28E00jg1R9jm6Nm4Qu2VG04', desc: ''},
@@ -87,6 +93,9 @@ const battleRef = useRef<Battle | null>(battle);
 battleRef.current = battle;
 const playerRef = useRef<PlayerState | null>(player);
 playerRef.current = player;
+// doRevive is defined below doDraw; the full-auto branch of doDraw reaches
+// it through this ref.
+const doReviveRef = useRef<((method: 'souls' | 'ad') => Promise<void>) | null>(null);
 
 const refresh = useCallback(async () => {
 const st = await api.state();
@@ -154,8 +163,11 @@ setBusy(true);
 setNotice(null);
 au.playVoice('draw');
 const startedAt = Date.now();
-// The result of a draw resolves on this beat (see DRAW_BEAT_MS).
-const beat = async () => { const w = DRAW_BEAT_MS - (Date.now() - startedAt); if (w > 0) await sleep(w);};
+// The result of a draw resolves on this beat (see DRAW_BEAT_MS). With
+// the speed-up item owned and set to fast, the beat shrinks to 1/1.5.
+const pl0 = playerRef.current;
+const beatMs = pl0?.speedUp && pl0?.speedFast ? Math.round(DRAW_BEAT_MS / 1.5) : DRAW_BEAT_MS;
+const beat = async () => { const w = beatMs - (Date.now() - startedAt); if (w > 0) await sleep(w);};
 const B: Battle = {...B0};
 const prevStreak = B.streak;
 let ended = false;
@@ -235,8 +247,25 @@ au.playVoice('miss');
 announce({ title: '残念！！', sub: `${B.streak}連チャンで終了`, tone: 'end'}, END_BEAT_MS);
 await sleep(END_BEAT_MS);
 setBusy(false);
-if (B.revivesUsed < 2) setShowRevive(true);
-else finishRun();
+if (B.revivesUsed >= 2) { finishRun(); return;}
+// Full-auto: the revive branch was chosen in advance, so answer it
+// automatically instead of opening the revive dialog. The one exception
+// is a preset 100-soul revive the player cannot afford — then auto
+// stops and the dialog is shown (never silently switched to an ad).
+const pl = playerRef.current;
+if (pl?.playMode === 'fullauto' && pl.fullAuto) {
+const choice = B.revivesUsed === 0? pl.faRevive1: pl.faRevive2;
+if (choice === 'end') { finishRun(); return;}
+if (choice === 'souls') {
+if (pl.souls >= 100) { await doReviveRef.current?.('souls'); return;}
+setShowRevive(true); return;
+}
+// choice === 'ad': ad-free owners revive instantly as usual; everyone
+// else gets the ad placeholder, which auto-completes in full-auto.
+if (pl.adFree) { await doReviveRef.current?.('ad'); return;}
+setShowAd(true); return;
+}
+setShowRevive(true);
 return;
 }
 setBusy(false);
@@ -275,6 +304,19 @@ announce({ title: '自己蘇生！！', sub: B.mode === 'ultra'? 'ウルトラ�
 if (B.mode === 'ultra') showNotice('自己蘇生！ ウルトラモンスターカードドローモードから再開！！', 'up');
 else showNotice('自己蘇生！ 通常モードから再開', 'info');
 }, [refresh, announce, showNotice]);
+doReviveRef.current = doRevive;
+
+// Auto / full-auto draw loop: while the battle is idle (no draw resolving,
+// no dialog or overlay up), press ドロー again on the same pacing a manual
+// player could. It therefore stops by itself at the revive dialog, the ad
+// placeholder and the result screen.
+const autoActive = !!player && player.playMode!== 'manual' && (player.autoDraw || player.fullAuto);
+useEffect(() => {
+if (!autoActive || view!== 'battle' ||!battle?.active || busy) return;
+if (showIntro || showRevive || showAd || showResult || showFlow) return;
+const t = window.setTimeout(() => { doDraw();}, 450);
+return () => window.clearTimeout(t);
+}, [autoActive, view, battle, busy, showIntro, showRevive, showAd, showResult, showFlow, doDraw]);
 
 const submitAndClose = useCallback(async (name: string) => {
 const B = battleRef.current;
@@ -395,6 +437,48 @@ return (
 <button className="drawbtn" disabled={busy || showIntro || showRevive || showResult} onClick={doDraw}>ドロー！！</button>
 </div>
 <p className="dmgline">総ダメージ {battle.damage.toLocaleString()} ／ 自己蘇生 残り{2 - battle.revivesUsed}回</p>
+{(player.speedUp || player.autoDraw || player.fullAuto) && (
+<div className="playpanel">
+{player.speedUp && (
+<div className="pp-row">
+<span className="pp-label">ドロー速度</span>
+<div className="seg">
+<button className={!player.speedFast? 'on': ''} onClick={async () => setPlayer(await api.settings({ speedFast: false}))}>通常</button>
+<button className={player.speedFast? 'on': ''} onClick={async () => setPlayer(await api.settings({ speedFast: true}))}>速い（1.5倍）</button>
+</div>
+</div>
+)}
+{(player.autoDraw || player.fullAuto) && (
+<div className="pp-row">
+<span className="pp-label">ドロー操作</span>
+<div className="seg">
+<button className={player.playMode === 'manual'? 'on': ''} onClick={async () => setPlayer(await api.settings({ playMode: 'manual'}))}>手動</button>
+<button className={player.playMode === 'auto'? 'on': ''} onClick={async () => setPlayer(await api.settings({ playMode: 'auto'}))}>オート</button>
+<button className={player.playMode === 'fullauto'? 'on': ''} disabled={!player.fullAuto} onClick={async () => setPlayer(await api.settings({ playMode: 'fullauto'}))}>フルオート</button>
+</div>
+</div>
+)}
+{player.fullAuto && (
+<>
+<div className="pp-row">
+<span className="pp-label">フルオート蘇生1回目</span>
+<div className="seg">
+<button className={player.faRevive1 === 'souls'? 'on': ''} onClick={async () => setPlayer(await api.settings({ faRevive1: 'souls'}))}>100ソウル</button>
+<button className={player.faRevive1 === 'ad'? 'on': ''} onClick={async () => setPlayer(await api.settings({ faRevive1: 'ad'}))}>広告を見る</button>
+<button className={player.faRevive1 === 'end'? 'on': ''} onClick={async () => setPlayer(await api.settings({ faRevive1: 'end'}))}>終了する</button>
+</div>
+</div>
+<div className="pp-row">
+<span className="pp-label">フルオート蘇生2回目</span>
+<div className="seg">
+<button className={player.faRevive2 === 'ad'? 'on': ''} onClick={async () => setPlayer(await api.settings({ faRevive2: 'ad'}))}>広告を見る</button>
+<button className={player.faRevive2 === 'end'? 'on': ''} onClick={async () => setPlayer(await api.settings({ faRevive2: 'end'}))}>終了する</button>
+</div>
+</div>
+</>
+)}
+</div>
+)}
 </div>
 </div>
 )}
@@ -452,7 +536,7 @@ return (
 {showAd && (
 <div className="overlay">
 <div className="modal">
-<AdPreparing onDone={() => doRevive('ad')} onCancel={() => setShowAd(false)} />
+<AdPreparing auto={player.playMode === 'fullauto'} onDone={() => doRevive('ad')} onCancel={() => { setShowAd(false); setShowRevive(true);}} />
 </div>
 </div>
 )}
@@ -489,13 +573,19 @@ img.src = URL.createObjectURL(file);
 });
 }
 
-function AdPreparing({ onDone, onCancel}: { onDone: () => void; onCancel: () => void}) {
+function AdPreparing({ onDone, onCancel, auto = false}: { onDone: () => void; onCancel: () => void; auto?: boolean}) {
 const [sec, setSec] = useState(8);
 useEffect(() => {
 if (sec <= 0) return;
 const t = window.setTimeout(() => setSec(sec - 1), 1000);
 return () => window.clearTimeout(t);
 }, [sec]);
+// Full-auto: the ad placeholder plays through and revives on its own
+// once the countdown finishes — no tap needed.
+const doneRef = useRef(false);
+useEffect(() => {
+if (auto && sec <= 0 &&!doneRef.current) { doneRef.current = true; onDone();}
+}, [auto, sec, onDone]);
 return (
 <div>
 <div className="adbox">広告は準備中です<br /><span style={{ fontSize: 13, fontWeight: 400}}>広告が始まったら、ここに広告が表示されます。あと少しだけお待ちください。</span></div>
@@ -749,13 +839,19 @@ onClick={() => owned
 <h2 className="sec">課金アイテム</h2>
 <div className="goldbox"><br />ご購入後、解除コードを購入時のメールアドレス宛に yamamoto510yoh@gmail.com からお送りします。届いたコードを下の「コード入力」に入力すると反映されます。</div>
 {PREMIUM.map((it) => {
-const owned = it.id === 'ad_free' && player.adFree;
+const owned = (it.id === 'ad_free' && player.adFree)
+|| (it.id === 'speed_up' && player.speedUp)
+|| (it.id === 'auto_draw' && player.autoDraw)
+|| (it.id === 'full_auto' && player.fullAuto)
+|| (it.id === 'duelist_pack' && player.adFree && player.speedUp && player.fullAuto);
 return (
 <div key={it.id} className="shopitem">
 <h4>{it.name} <span className="price">{it.price}</span></h4>
 {it.desc && <p className="note">{it.desc}</p>}
-{owned? <p className="msg ok">所有済み（有効になっています）</p>: (
+{owned? <p className="msg ok">所有済み（有効になっています）</p>: it.url? (
 <a className="buybtn" href={stripeUrl(it.url)} target="_blank" rel="noreferrer" style={{ display: 'inline-block', textDecoration: 'none'}}>購入する（Stripe）</a>
+): (
+<p className="note">現在はコードで有効化できます。コードは下の「コード入力」に入力してください。</p>
 )}
 </div>
 );

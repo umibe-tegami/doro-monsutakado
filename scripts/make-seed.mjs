@@ -16,6 +16,10 @@ const MAP = {
   'souls5500_codes.txt': 'souls5500',
   'souls14000_codes.txt': 'souls14000',
   'souls30000_codes.txt': 'souls30000',
+  'speed_up.txt': 'speed_up',
+  'auto_draw.txt': 'auto_draw',
+  'full_auto.txt': 'full_auto',
+  'duelist_pack.txt': 'duelist_pack',
 };
 const out = {};
 for (const [file, item] of Object.entries(MAP)) {

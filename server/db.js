@@ -14,6 +14,13 @@ const SCHEMA = [
     lifetime_souls INTEGER NOT NULL DEFAULT 300,
     ad_free INTEGER NOT NULL DEFAULT 0,
     double_draw INTEGER NOT NULL DEFAULT 0,
+    speed_up INTEGER NOT NULL DEFAULT 0,
+    auto_draw INTEGER NOT NULL DEFAULT 0,
+    full_auto INTEGER NOT NULL DEFAULT 0,
+    speed_fast INTEGER NOT NULL DEFAULT 0,
+    play_mode TEXT NOT NULL DEFAULT 'manual',
+    fa_revive1 TEXT NOT NULL DEFAULT 'ad',
+    fa_revive2 TEXT NOT NULL DEFAULT 'ad',
     bgm_enabled INTEGER NOT NULL DEFAULT 1,
     voice_muted INTEGER NOT NULL DEFAULT 0,
     selected_bg TEXT NOT NULL DEFAULT 'default',
@@ -62,9 +69,26 @@ const SCHEMA_PG = SCHEMA.map((s) =>
   s.replace('id INTEGER PRIMARY KEY AUTOINCREMENT', 'id SERIAL PRIMARY KEY'),
 );
 
+// Columns added after the first release: CREATE TABLE IF NOT EXISTS does not
+// retrofit them into existing databases, so both backends add what is missing.
+const PLAYER_MIGRATIONS = [
+  ['speed_up', 'INTEGER NOT NULL DEFAULT 0'],
+  ['auto_draw', 'INTEGER NOT NULL DEFAULT 0'],
+  ['full_auto', 'INTEGER NOT NULL DEFAULT 0'],
+  ['speed_fast', 'INTEGER NOT NULL DEFAULT 0'],
+  ['play_mode', "TEXT NOT NULL DEFAULT 'manual'"],
+  ['fa_revive1', "TEXT NOT NULL DEFAULT 'ad'"],
+  ['fa_revive2', "TEXT NOT NULL DEFAULT 'ad'"],
+];
+
 class PgDb {
   constructor(pool) { this.pool = pool; }
-  async init() { for (const s of SCHEMA_PG) await this.pool.query(s); }
+  async init() {
+    for (const s of SCHEMA_PG) await this.pool.query(s);
+    for (const [col, def] of PLAYER_MIGRATIONS) {
+      await this.pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS ${col} ${def}`);
+    }
+  }
   async one(sql, params = []) { const r = await this.pool.query(sql, params); return r.rows[0] || null; }
   async all(sql, params = []) { const r = await this.pool.query(sql, params); return r.rows; }
   async run(sql, params = []) { await this.pool.query(sql, params); }
@@ -72,7 +96,13 @@ class PgDb {
 
 class SqliteDb {
   constructor(db) { this.db = db; }
-  async init() { for (const s of SCHEMA) this.db.exec(s); }
+  async init() {
+    for (const s of SCHEMA) this.db.exec(s);
+    const cols = new Set(this.db.prepare('PRAGMA table_info(players)').all().map((r) => r.name));
+    for (const [col, def] of PLAYER_MIGRATIONS) {
+      if (!cols.has(col)) this.db.exec(`ALTER TABLE players ADD COLUMN ${col} ${def}`);
+    }
+  }
   // Translate $1,$2.. placeholders to ? for sqlite, expanding repeated
   // placeholders (e.g. "SET a = a + $1, b = b + $1") into separate bindings.
   conv(sql, params) {

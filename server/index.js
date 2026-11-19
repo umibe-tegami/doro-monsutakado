@@ -93,6 +93,13 @@ async function playerState(id) {
     souls: Number(p.souls),
     lifetimeSouls: Number(p.lifetime_souls),
     adFree: !!Number(p.ad_free),
+    speedUp: !!Number(p.speed_up),
+    autoDraw: !!Number(p.auto_draw),
+    fullAuto: !!Number(p.full_auto),
+    speedFast: !!Number(p.speed_fast),
+    playMode: ['auto', 'fullauto'].includes(p.play_mode) ? p.play_mode : 'manual',
+    faRevive1: ['souls', 'ad', 'end'].includes(p.fa_revive1) ? p.fa_revive1 : 'ad',
+    faRevive2: ['ad', 'end'].includes(p.fa_revive2) ? p.fa_revive2 : 'ad',
     bgmEnabled: !!Number(p.bgm_enabled),
     voiceMuted: !!Number(p.voice_muted),
     selectedBg: p.selected_bg,
@@ -256,6 +263,13 @@ app.post('/api/select-cosmetic', async (req, res) => {
   res.json(await playerState(id));
 });
 
+const FLAG_ITEMS = {
+  ad_free: { col: 'ad_free', message: '広告無期限廃止が有効になりました' },
+  speed_up: { col: 'speed_up', message: 'ドロー速度アップが有効になりました' },
+  auto_draw: { col: 'auto_draw', message: 'オートドローが有効になりました' },
+  full_auto: { col: 'full_auto', message: 'フルオートドローが有効になりました' },
+};
+
 app.post('/api/redeem-code', async (req, res) => {
   const id = needPlayer(req, res); if (!id) return;
   const code = String(req.body.code || '').trim().toUpperCase();
@@ -265,16 +279,29 @@ app.post('/api/redeem-code', async (req, res) => {
   const p = await getPlayer(id);
   const item = row.item_id;
   if (item === 'double_draw') return res.status(400).json({ error: '2ドローパスは販売を終了しました' });
-  if (item === 'ad_free' && Number(p.ad_free)) return res.status(400).json({ error: '既に所有しています（コードは消費されません）' });
+  if (item === 'duelist_pack' && Number(p.ad_free) && Number(p.speed_up) && Number(p.full_auto)) return res.status(400).json({ error: '既に所有しています（コードは消費されません）' });
+  const flag = FLAG_ITEMS[item];
+  if (flag && Number(p[flag.col])) return res.status(400).json({ error: '既に所有しています（コードは消費されません）' });
   await db.run('UPDATE redemption_codes SET used_by = $1, used_at = $2 WHERE code = $3', [id, Date.now(), code]);
   let message = '';
-  if (item === 'ad_free') { await db.run('UPDATE players SET ad_free = 1 WHERE id = $1', [id]); message = '広告無期限廃止が有効になりました'; }
+  if (item === 'duelist_pack') {
+    // Bundle grant: no dedicated flag — the three items light up together.
+    await db.run('UPDATE players SET ad_free = 1, speed_up = 1, speed_fast = 1, full_auto = 1 WHERE id = $1', [id]);
+    message = 'デュエリストパックが有効になりました（広告無期限廃止・ドロー速度アップ・フルオートドロー）';
+  }
+  else if (flag) {
+    await db.run(`UPDATE players SET ${flag.col} = 1 WHERE id = $1`, [id]);
+    // Speed-up turns itself on as soon as it is owned (the player can
+    // switch back to normal speed in the battle screen).
+    if (item === 'speed_up') await db.run('UPDATE players SET speed_fast = 1 WHERE id = $1', [id]);
+    message = flag.message;
+  }
   else if (SOUL_PACKS[item]) {
     await db.run('UPDATE players SET souls = souls + $1, lifetime_souls = lifetime_souls + $1 WHERE id = $2', [SOUL_PACKS[item], id]);
     message = `${SOUL_PACKS[item].toLocaleString()}ソウルを付与しました`;
   }
   const st = await playerState(id);
-  res.json({ item, message, souls: st.souls, adFree: st.adFree });
+  res.json({ item, message, souls: st.souls, adFree: st.adFree, speedUp: st.speedUp, autoDraw: st.autoDraw, fullAuto: st.fullAuto });
 });
 
 app.post('/api/submit-score', async (req, res) => {
@@ -326,9 +353,20 @@ app.post('/api/rankings', async (req, res) => {
 
 app.post('/api/settings', async (req, res) => {
   const id = needPlayer(req, res); if (!id) return;
-  await getPlayer(id);
+  const p = await getPlayer(id);
   if (typeof req.body.bgmEnabled === 'boolean') await db.run('UPDATE players SET bgm_enabled = $1 WHERE id = $2', [req.body.bgmEnabled ? 1 : 0, id]);
   if (typeof req.body.voiceMuted === 'boolean') await db.run('UPDATE players SET voice_muted = $1 WHERE id = $2', [req.body.voiceMuted ? 1 : 0, id]);
+  if (typeof req.body.speedFast === 'boolean') await db.run('UPDATE players SET speed_fast = $1 WHERE id = $2', [req.body.speedFast && Number(p.speed_up) ? 1 : 0, id]);
+  if (typeof req.body.playMode === 'string') {
+    // A mode can only be selected when the matching item is owned:
+    // オート needs auto_draw or full_auto; フルオート needs full_auto.
+    let mode = 'manual';
+    if (req.body.playMode === 'auto' && (Number(p.auto_draw) || Number(p.full_auto))) mode = 'auto';
+    if (req.body.playMode === 'fullauto' && Number(p.full_auto)) mode = 'fullauto';
+    await db.run('UPDATE players SET play_mode = $1 WHERE id = $2', [mode, id]);
+  }
+  if (['souls', 'ad', 'end'].includes(req.body.faRevive1)) await db.run('UPDATE players SET fa_revive1 = $1 WHERE id = $2', [req.body.faRevive1, id]);
+  if (['ad', 'end'].includes(req.body.faRevive2)) await db.run('UPDATE players SET fa_revive2 = $1 WHERE id = $2', [req.body.faRevive2, id]);
   res.json(await playerState(id));
 });
 

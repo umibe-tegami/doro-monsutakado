@@ -75,7 +75,12 @@ const dirA = fs.mkdtempSync(path.join(os.tmpdir(), 'doro-wh-a-'));
 const dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'doro-wh-b-'));
 let serverA, serverB;
 try {
-  serverA = await startServer(PORT_A, dirA, { STRIPE_WEBHOOK_SECRET: SECRET });
+  serverA = await startServer(PORT_A, dirA, {
+    STRIPE_WEBHOOK_SECRET: SECRET,
+    // Test seam for the price-ID table (production registers IDs in
+    // PRICE_GRANTS inside server/stripe-webhook.js instead).
+    STRIPE_PRICE_GRANTS: JSON.stringify({ price_test_adfree: 'ad_free', price_test_speed: 'speed_up' }),
+  });
   serverB = await startServer(PORT_B, dirB, { STRIPE_WEBHOOK_SECRET: '' });
   // Note: empty string is falsy, so instance B behaves as "not configured".
 
@@ -98,13 +103,58 @@ try {
   check('duplicate event: flagged as duplicate', r2.body.duplicate === true, JSON.stringify(r2.body));
   check('duplicate event: balance unchanged', after2.souls === 1300, `souls=${after2.souls}`);
 
-  // 3. Ad-free grant: 280 JPY -> ad_free flag.
+  // 3. Amount-only 280 JPY no longer grants anything: three items share
+  // that price, so a price ID is required to tell them apart.
   const ev3 = checkoutEvent('evt_test_3', { client_reference_id: PLAYER, amount_total: 280 });
   const r3 = await postWebhook(PORT_A, ev3, sign(ev3, SECRET));
   const after3 = await state(PORT_A, PLAYER);
-  check('grant ad_free: HTTP 200', r3.status === 200, `status=${r3.status}`);
-  check('grant ad_free: flag set', after3.adFree === true, `adFree=${after3.adFree}`);
-  check('grant ad_free: souls unchanged', after3.souls === 1300, `souls=${after3.souls}`);
+  check('amount-only 280: HTTP 200', r3.status === 200, `status=${r3.status}`);
+  check('amount-only 280: ad_free NOT granted', after3.adFree === false, `adFree=${after3.adFree}`);
+  check('amount-only 280: souls unchanged', after3.souls === 1300, `souls=${after3.souls}`);
+
+  // 3b. Price-ID grant: ad_free via a registered price ID (280 JPY).
+  const evP1 = checkoutEvent('evt_price_adfree', {
+    client_reference_id: PLAYER, amount_total: 280,
+    line_items: { data: [{ price: { id: 'price_test_adfree' } }] },
+  });
+  const rP1 = await postWebhook(PORT_A, evP1, sign(evP1, SECRET));
+  const afterP1 = await state(PORT_A, PLAYER);
+  check('price grant ad_free: HTTP 200', rP1.status === 200, `status=${rP1.status}`);
+  check('price grant ad_free: flag set', afterP1.adFree === true, `adFree=${afterP1.adFree}`);
+  check('price grant ad_free: souls unchanged', afterP1.souls === 1300, `souls=${afterP1.souls}`);
+
+  // 3c. Price-ID grant: speed_up via its own price ID (also 280 JPY),
+  // and ownership starts out with the fast speed enabled.
+  const evP2 = checkoutEvent('evt_price_speed', {
+    client_reference_id: PLAYER, amount_total: 280,
+    line_items: { data: [{ price: { id: 'price_test_speed' } }] },
+  });
+  const rP2 = await postWebhook(PORT_A, evP2, sign(evP2, SECRET));
+  const afterP2 = await state(PORT_A, PLAYER);
+  check('price grant speed_up: HTTP 200', rP2.status === 200, `status=${rP2.status}`);
+  check('price grant speed_up: flag set', afterP2.speedUp === true, `speedUp=${afterP2.speedUp}`);
+  check('price grant speed_up: fast enabled', afterP2.speedFast === true, `speedFast=${afterP2.speedFast}`);
+
+  // 3d. Full-auto via the unique 980 JPY amount (no price ID needed).
+  const evP3 = checkoutEvent('evt_fullauto_980', { client_reference_id: PLAYER, amount_total: 980 });
+  const rP3 = await postWebhook(PORT_A, evP3, sign(evP3, SECRET));
+  const afterP3 = await state(PORT_A, PLAYER);
+  check('amount grant full_auto: HTTP 200', rP3.status === 200, `status=${rP3.status}`);
+  check('amount grant full_auto: flag set', afterP3.fullAuto === true, `fullAuto=${afterP3.fullAuto}`);
+  check('amount grant full_auto: souls unchanged', afterP3.souls === 1300, `souls=${afterP3.souls}`);
+
+  // 3e. Duelist pack via the unique 1080 JPY amount, on a fresh player:
+  // ad_free + speed_up (fast starts on) + full_auto light up together.
+  const PLAYER2 = 'webhook-test-player-2';
+  await state(PORT_A, PLAYER2); // creates the player
+  const evP4 = checkoutEvent('evt_duelist_1080', { client_reference_id: PLAYER2, amount_total: 1080 });
+  const rP4 = await postWebhook(PORT_A, evP4, sign(evP4, SECRET));
+  const afterP4 = await state(PORT_A, PLAYER2);
+  check('amount grant duelist_pack: HTTP 200', rP4.status === 200, `status=${rP4.status}`);
+  check('amount grant duelist_pack: all three flags set',
+    afterP4.adFree === true && afterP4.speedUp === true && afterP4.fullAuto === true,
+    `adFree=${afterP4.adFree} speedUp=${afterP4.speedUp} fullAuto=${afterP4.fullAuto}`);
+  check('amount grant duelist_pack: fast enabled', afterP4.speedFast === true, `speedFast=${afterP4.speedFast}`);
 
   // 4. Unknown amount: 200, nothing granted.
   const ev4 = checkoutEvent('evt_test_4', { client_reference_id: PLAYER, amount_total: 999 });
@@ -148,11 +198,15 @@ const db = new DatabaseSync(path.join(dirA, 'game.db'), { readOnly: true });
 const ghost = db.prepare('SELECT id FROM players WHERE id = ?').get('ghost-player-x');
 check('unknown player: no player row was created', !ghost);
 const events = db.prepare('SELECT event_id, result FROM stripe_events ORDER BY processed_at').all();
-check('stripe_events recorded 5 checkout events', events.length === 5, JSON.stringify(events));
+check('stripe_events recorded 9 checkout events', events.length === 9, JSON.stringify(events));
 const results = Object.fromEntries(events.map((e) => [e.event_id, e.result]));
 check('event results look right',
   results.evt_test_1 === 'granted:souls:1000' &&
-  results.evt_test_3 === 'granted:ad_free' &&
+  results.evt_test_3 === 'skipped:unknown_amount' &&
+  results.evt_price_adfree === 'granted:ad_free' &&
+  results.evt_price_speed === 'granted:speed_up' &&
+  results.evt_fullauto_980 === 'granted:full_auto' &&
+  results.evt_duelist_1080 === 'granted:duelist_pack' &&
   results.evt_test_4 === 'skipped:unknown_amount' &&
   results.evt_test_5 === 'skipped:unknown_player' &&
   results.evt_test_6 === 'skipped:no_client_reference_id',
